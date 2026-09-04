@@ -1,0 +1,8 @@
+{
+  "name": "Idea to App Pipeline",
+  "description": "An automated pipeline that generates SaaS ideas and builds them into deployable MVPs.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
