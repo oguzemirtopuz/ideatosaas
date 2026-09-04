@@ -1,4 +1,6 @@
-import serverless from "serverless-http";
-import app from "../src/app.js"; // TS compiler will resolve .js to .ts 
+import app from "../src/app.js";
 
-export default serverless(app);
+export default (req: any, res: any) => {
+  return app(req, res);
+};
+
