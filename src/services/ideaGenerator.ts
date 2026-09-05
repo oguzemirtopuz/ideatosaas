@@ -230,20 +230,45 @@ Yanitini KESINLIKLE asagidaki JSON formatinda ver, disinda hicbir metin veya mar
 ]`;
     }
 
-    const response = await groq.chat.completions.create({
-      model: "llama-3.1-8b-instant",
-      messages: [
-        {
-          role: "system",
-          content: "Sen bir JSON API'sisin. Sadece gecerli JSON dizisi dondur, baska hicbir metin ekleme.",
-        },
-        { role: "user", content: prompt },
-      ],
-      temperature: 0.7,
-      max_tokens: 4096,
-    });
+    const candidateModels = [
+      "llama-3.3-70b-versatile",
+      "llama-3.1-8b-instant",
+      "llama3-70b-8192",
+      "llama3-8b-8192",
+      "mixtral-8x7b-32768"
+    ];
 
-    const rawText = response.choices[0]?.message?.content || "[]";
+    let response = null;
+    let lastError = null;
+
+    for (const modelName of candidateModels) {
+      try {
+        response = await groq.chat.completions.create({
+          model: modelName,
+          messages: [
+            {
+              role: "system",
+              content: "Sen bir JSON API'sisin. Sadece gecerli JSON dizisi dondur, baska hicbir metin veya aciklama ekleme.",
+            },
+            { role: "user", content: prompt },
+          ],
+          temperature: 0.7,
+          max_tokens: 4096,
+        });
+        if (response?.choices?.[0]?.message?.content) {
+          break;
+        }
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`Model ${modelName} basarisiz oldu: ${err.message}. Sonraki deneniyor...`);
+      }
+    }
+
+    if (!response || !response.choices?.[0]?.message?.content) {
+      throw new Error(`Tum Groq modelleri basarisiz oldu: ${lastError?.message || "Bilinmeyen hata"}`);
+    }
+
+    const rawText = response.choices[0].message.content;
     const cleanedText = rawText.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
     const ideas = JSON.parse(cleanedText);
 
