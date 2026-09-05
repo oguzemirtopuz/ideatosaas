@@ -187,6 +187,14 @@ export function sanitizeReactCode(code: string): string {
     "$1"
   );
 
+  // 5. Eğer App adında bir bileşen yoksa, büyük harfle başlayan bileşeni App olarak ata
+  if (!/(?:function|const|var|let|class)\s+App\b/.test(cleaned)) {
+    const compMatch = cleaned.match(/(?:function|class)\s+([A-Z][a-zA-Z0-9_]*)/);
+    if (compMatch && compMatch[1]) {
+      cleaned += `\nvar App = ${compMatch[1]};`;
+    }
+  }
+
   return cleaned.trim();
 }
 

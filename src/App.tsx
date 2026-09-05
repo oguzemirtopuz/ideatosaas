@@ -466,6 +466,14 @@ export default function App() {
       "$1"
     );
 
+    // 5. Eğer App adında bir bileşen yoksa, büyük harfle başlayan bileşeni App olarak ata
+    if (!/(?:function|const|var|let|class)\s+App\b/.test(cleaned)) {
+      const compMatch = cleaned.match(/(?:function|class)\s+([A-Z][a-zA-Z0-9_]*)/);
+      if (compMatch && compMatch[1]) {
+        cleaned += `\nvar App = ${compMatch[1]};`;
+      }
+    }
+
     return cleaned.trim();
   };
 
@@ -484,12 +492,40 @@ export default function App() {
           <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
           <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
           <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-          <style>body { font-family: system-ui, -apple-system, sans-serif; margin: 0; }</style>
+          <style>
+            body { font-family: system-ui, -apple-system, sans-serif; margin: 0; min-height: 100vh; }
+            #loading-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 350px; color: #737373; font-size: 13px; gap: 12px; }
+            .spinner { width: 28px; height: 28px; border: 3px solid #e5e5e5; border-top-color: #171717; border-radius: 50%; animation: spin 0.8s linear infinite; }
+            @keyframes spin { to { transform: rotate(360deg); } }
+          </style>
         </head>
         <body class="bg-neutral-50 p-4">
+          <div id="loading-state">
+            <div class="spinner"></div>
+            <span class="font-medium">Uygulama derleniyor ve başlatılıyor...</span>
+          </div>
           <div id="root"></div>
-          <div id="error-box" style="display:none; color:#b91c1c; background:#fef2f2; border:1px solid #fecaca; padding:16px; border-radius:12px; font-family:monospace; font-size:12px; white-space:pre-wrap;"></div>
+          <div id="error-box" style="display:none; color:#991b1b; background:#fef2f2; border:1px solid #fecaca; padding:16px; border-radius:12px; font-family:monospace; font-size:12px; white-space:pre-wrap; margin-top:12px;"></div>
+
           <script>
+            function showError(msg) {
+              var loader = document.getElementById('loading-state');
+              if (loader) loader.style.display = 'none';
+              var errBox = document.getElementById('error-box');
+              if (errBox) {
+                errBox.style.display = 'block';
+                errBox.innerText = 'Çalışma Hatası: ' + msg;
+              }
+            }
+
+            window.addEventListener('error', function(e) {
+              showError(e.error ? e.error.message : e.message);
+            });
+
+            window.addEventListener('unhandledrejection', function(e) {
+              showError(e.reason ? (e.reason.message || String(e.reason)) : 'Bilinmeyen asenkron hata');
+            });
+
             // Harici ikonlar için otomatik çökme koruması
             window.LucideIcons = new Proxy({}, {
               get: function(target, prop) {
@@ -502,34 +538,79 @@ export default function App() {
               }
             });
 
-            function executeApp() {
-              try {
-                var codeToRun = ${codeJson};
-                if (!window.Babel) {
-                  throw new Error('Babel derleyicisi yüklenemedi.');
+            var attempts = 0;
+            function checkAndRun() {
+              attempts++;
+              if (!window.Babel || !window.React || !window.ReactDOM) {
+                if (attempts < 60) {
+                  setTimeout(checkAndRun, 50);
+                } else {
+                  showError('Kütüphaneler yüklenemedi (React/Babel CDN zaman aşımı). Lütfen internet bağlantınızı kontrol edip sayfayı yenileyin.');
                 }
+                return;
+              }
+
+              try {
+                var rawCode = ${codeJson};
+
+                // React Error Boundary tanımla
+                var ErrorBoundary = (function() {
+                  function EB(props) {
+                    React.Component.call(this, props);
+                    this.state = { hasError: false, error: null };
+                  }
+                  EB.prototype = Object.create(React.Component.prototype);
+                  EB.prototype.constructor = EB;
+                  EB.getDerivedStateFromError = function(err) {
+                    return { hasError: true, error: err };
+                  };
+                  EB.prototype.componentDidCatch = function(err, info) {
+                    console.error("Component Error:", err, info);
+                  };
+                  EB.prototype.render = function() {
+                    if (this.state.hasError) {
+                      return React.createElement('div', {
+                        className: 'p-6 bg-red-50 border border-red-200 rounded-xl text-red-900 font-sans m-2'
+                      }, [
+                        React.createElement('h3', { className: 'font-bold text-sm text-red-900 mb-1', key: 'title' }, 'Bileşen Çalışma Hatası:'),
+                        React.createElement('pre', { className: 'text-xs text-red-700 whitespace-pre-wrap font-mono mt-2', key: 'msg' }, this.state.error ? (this.state.error.message || String(this.state.error)) : 'Bilinmeyen hata')
+                      ]);
+                    }
+                    return this.props.children;
+                  };
+                  return EB;
+                })();
+
+                // Babel ile JSX'i derle
                 var transformed = window.Babel.transform(
                   "const { useState, useEffect, useMemo, useRef, useCallback } = React;\\n" +
-                  codeToRun +
-                  "\\nif (typeof App !== 'undefined') { ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App)); } else { document.getElementById('root').innerHTML = '<div class=\"p-4 text-amber-700 bg-amber-50 rounded-lg\">App bileşeni bulunamadı.</div>'; }",
+                  rawCode +
+                  "\\nif (typeof App === 'undefined') {\\n" +
+                  "  var _comps = [typeof Main !== 'undefined' ? Main : null, typeof SaaSApp !== 'undefined' ? SaaSApp : null, typeof Dashboard !== 'undefined' ? Dashboard : null].filter(Boolean);\\n" +
+                  "  if (_comps.length > 0) { var App = _comps[0]; }\\n" +
+                  "}\\n" +
+                  "return (typeof App !== 'undefined' ? App : null);",
                   { presets: ['react'] }
                 ).code;
-                
-                new Function(transformed)();
-              } catch (err) {
-                var errBox = document.getElementById('error-box');
-                if (errBox) {
-                  errBox.style.display = 'block';
-                  errBox.innerText = 'Çalışma Hatası: ' + err.message;
+
+                var ResolvedApp = new Function(transformed)();
+
+                var loader = document.getElementById('loading-state');
+                if (loader) loader.style.display = 'none';
+
+                if (ResolvedApp) {
+                  var rootEl = document.getElementById('root');
+                  var root = ReactDOM.createRoot(rootEl);
+                  root.render(React.createElement(ErrorBoundary, null, React.createElement(ResolvedApp)));
+                } else {
+                  showError('Ana bileşen (App) tanımlanamadı. Lütfen AI asistanından kodu yenilemesini isteyin.');
                 }
+              } catch (err) {
+                showError(err.message);
               }
             }
 
-            if (document.readyState === 'loading') {
-              document.addEventListener('DOMContentLoaded', executeApp);
-            } else {
-              executeApp();
-            }
+            checkAndRun();
           </script>
         </body>
       </html>
