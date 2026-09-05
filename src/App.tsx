@@ -148,6 +148,12 @@ export default function App() {
 
   // Kodun canlı iframe önizlemesi için HTML üretimi
   const getPreviewHtml = (code: string) => {
+    // import ve export temizleme
+    let cleanCode = code
+      .replace(/import\s+.*?from\s+['"].*?['"];?/g, '')
+      .replace(/export\s+default\s+function\s+(\w+)/g, 'function App')
+      .replace(/export\s+default\s+\w+;?/g, '');
+
     return `
       <!DOCTYPE html>
       <html>
@@ -155,16 +161,36 @@ export default function App() {
           <meta charset="utf-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1" />
           <script src="https://cdn.tailwindcss.com"></script>
-          <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-          <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+          <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+          <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
           <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
           <style>body { font-family: system-ui, -apple-system, sans-serif; }</style>
         </head>
         <body class="bg-neutral-50 p-4">
           <div id="root"></div>
+          <div id="error-display" style="display:none; color:red; background:#fee; padding:16px; border-radius:8px; font-family:monospace; white-space:pre-wrap;"></div>
+          <script>
+            window.onerror = function(msg, url, line, col, error) {
+              var errDiv = document.getElementById('error-display');
+              errDiv.style.display = 'block';
+              errDiv.innerText = 'Çalışma Zamanı Hatası: ' + msg + '\\nSatır: ' + line;
+            };
+          </script>
           <script type="text/babel">
-            ${code.replace(/export\s+default\s+function\s+App/g, 'function App')}
-            ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+            try {
+              const { useState, useEffect, useMemo, useRef } = React;
+              ${cleanCode}
+              
+              if (typeof App !== 'undefined') {
+                ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+              } else {
+                document.getElementById('error-display').style.display = 'block';
+                document.getElementById('error-display').innerText = 'Hata: Ana bileşen (App) bulunamadı.';
+              }
+            } catch (err) {
+              document.getElementById('error-display').style.display = 'block';
+              document.getElementById('error-display').innerText = 'Derleme Hatası: ' + err.message;
+            }
           </script>
         </body>
       </html>
