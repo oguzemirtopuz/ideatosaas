@@ -230,18 +230,25 @@ Yanitini KESINLIKLE asagidaki JSON formatinda ver, disinda hicbir metin veya mar
 ]`;
     }
 
-    const candidateModels = [
-      "gemma2-9b-it",
-      "llama-3.3-70b-specdec",
-      "llama-3.2-11b-vision-preview",
-      "llama-3.2-3b-preview",
-      "llama-3.2-1b-preview"
-    ];
+    // Groq uzerindeki aktif modelleri dinamik olarak sorgula
+    let activeModels: string[] = [];
+    try {
+      const modelList = await groq.models.list();
+      activeModels = modelList.data
+        .filter((m: any) => m.active && !m.id.includes("whisper") && !m.id.includes("guard"))
+        .map((m: any) => m.id);
+    } catch (e: any) {
+      console.warn("Modeller listelenemedi, varsayilanlara geciliyor:", e.message);
+    }
+
+    if (activeModels.length === 0) {
+      activeModels = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "gemma2-9b-it"];
+    }
 
     let response = null;
     let lastError = null;
 
-    for (const modelName of candidateModels) {
+    for (const modelName of activeModels) {
       try {
         response = await groq.chat.completions.create({
           model: modelName,
@@ -256,11 +263,12 @@ Yanitini KESINLIKLE asagidaki JSON formatinda ver, disinda hicbir metin veya mar
           max_tokens: 4096,
         });
         if (response?.choices?.[0]?.message?.content) {
+          console.log(`Basarili model: ${modelName}`);
           break;
         }
       } catch (err: any) {
         lastError = err;
-        console.warn(`Model ${modelName} basarisiz oldu: ${err.message}. Sonraki deneniyor...`);
+        console.warn(`Model ${modelName} basarisiz oldu: ${err.message}.`);
       }
     }
 
