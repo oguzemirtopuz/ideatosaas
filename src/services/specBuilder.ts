@@ -113,6 +113,83 @@ Aşağıdaki JSON formatında yanıt ver (Markdown veya ek metin kullanma):
   }
 }
 
+// React kodunu temizleme ve import/export kalıntılarını arındırma fonksiyonu
+export function sanitizeReactCode(code: string): string {
+  if (!code) return "";
+
+  let cleaned = code
+    // Markdown bloklarını kaldır
+    .replace(/^```[a-zA-Z]*\n/gm, "")
+    .replace(/\n```$/gm, "")
+    .trim();
+
+  // 1. React importlarını React global nesnesine bağla
+  cleaned = cleaned.replace(
+    /import\s+React\s*,\s*\{([^}]+)\}\s+from\s+['"][^'"]+['"];?/g,
+    "const { $1 } = React;"
+  );
+  cleaned = cleaned.replace(
+    /import\s*\{([^}]+)\}\s+from\s+['"]react['"];?/g,
+    "const { $1 } = React;"
+  );
+  cleaned = cleaned.replace(
+    /import\s+React\s+from\s+['"]react['"];?/g,
+    "/* React global */"
+  );
+  cleaned = cleaned.replace(
+    /import\s+\*\s+as\s+React\s+from\s+['"]react['"];?/g,
+    "/* React global */"
+  );
+
+  // 2. Lucide veya ikon kütüphanesi importlarını Proxy'ye bağla
+  cleaned = cleaned.replace(
+    /import\s*\{([^}]+)\}\s+from\s+['"](?:lucide-react|react-icons[^'"]*)['"];?/g,
+    "const { $1 } = (window.LucideIcons || {});"
+  );
+
+  // 3. Çok satırlı veya tek satırlı kalan TÜM importları yok et
+  cleaned = cleaned.replace(
+    /\bimport\s+[\s\S]*?from\s*['"`][^'"`]+['"`]\s*;?/g,
+    ""
+  );
+  cleaned = cleaned.replace(
+    /\bimport\s*['"`][^'"`]+['"`]\s*;?/g,
+    ""
+  );
+  cleaned = cleaned.replace(
+    /^\s*import\b.*$/gm,
+    ""
+  );
+
+  // 4. Export ifadelerini App bileşenini hedefleyecek şekilde dönüştür
+  cleaned = cleaned.replace(
+    /export\s+default\s+function\s*(\w*)/g,
+    "function App"
+  );
+  cleaned = cleaned.replace(
+    /export\s+default\s+class\s*(\w*)/g,
+    "class App"
+  );
+  cleaned = cleaned.replace(
+    /export\s+default\s+([A-Za-z0-9_$]+)\s*;?/g,
+    "var App = $1;"
+  );
+  cleaned = cleaned.replace(
+    /export\s+default\s+[\s\S]*?;?/g,
+    ""
+  );
+  cleaned = cleaned.replace(
+    /export\s+{[^}]+};?/g,
+    ""
+  );
+  cleaned = cleaned.replace(
+    /export\s+(const|let|var|function|class)/g,
+    "$1"
+  );
+
+  return cleaned.trim();
+}
+
 // Aşama 2: Canlı Çalışan Uygulama Kodu Üretici Handler
 export async function buildAppHandler(req: Request, res: Response) {
   try {
@@ -158,8 +235,9 @@ Ekranlar: ${JSON.stringify(spec.screens)}
 KESİN KURALLAR:
 1. SADECE ÇALIŞAN KODU VER. Kesinlikle hiçbir sohbet, açıklama veya Türkçe metin YAZMA.
 2. Kod "function App() {" ile başlamalı ve SÜSLÜ PARANTEZ İLE KUSURSUZCA KAPANMALIDIR (KOD ASLA YARIDA KESİLMEMELİ).
-3. Import veya export cümleleri KULLANMA. React hook'ları (useState, useEffect) doğrudan mevcuttur.
-4. Kompakt, temiz, hatasız Tailwind CSS kullan. Gereksiz uzun tekrarlardan kaçınarak bileşeni tam ve eksiksiz bitir.`;
+3. ASLA import veya export yazma. React hook'ları (useState, useEffect, useMemo, useRef) doğrudan mevcuttur.
+4. Harici ikon kütüphaneleri (lucide-react vb.) IMPORT ETME. İkonlar için emojiler (✨, 🚀, ⚡, 📊, ⚙️, 🔍, 💡, 🎯 vb.) veya SVG kullan.
+5. Kompakt, temiz, hatasız Tailwind CSS kullan. Gereksiz uzun tekrarlardan kaçınarak bileşeni tam ve eksiksiz bitir.`;
 
     let response = null;
     for (const modelName of priorityModels) {
@@ -169,21 +247,21 @@ KESİN KURALLAR:
           messages: [
             { 
               role: "system", 
-              content: "Sen bir derleyicisin. Çıktın SADECE çalışan, bitmiş, tam kapatılmış JavaScript/JSX kodu olmalıdır. Kod asla yarıda kesilmemelidir." 
+              content: "Sen bir derleyicisin. Çıktın SADECE çalışan, bitmiş, tam kapatılmış JavaScript/JSX kodu olmalıdır. Asla import/export yazma. Kod asla yarıda kesilmemelidir." 
             },
             { role: "user", content: prompt }
           ],
           temperature: 0.2,
-          max_tokens: 6500
+          max_tokens: 4500
         });
         if (response?.choices?.[0]?.message?.content) {
           const raw = response.choices[0].message.content;
-          if (raw.includes("function App") && raw.trim().endsWith("}")) {
+          if (raw.includes("App") && raw.trim().endsWith("}")) {
             break;
           }
         }
-      } catch (err) {
-        // sonraki modeli dene
+      } catch (err: any) {
+        console.error(`Groq build error with ${modelName}:`, err?.message || err);
       }
     }
 
@@ -199,13 +277,9 @@ KESİN KURALLAR:
       rawCode = codeBlockMatch[1].trim();
     }
 
-    // Eğer model hala başta açıklama yaptıysa, "function App" veya "const App" öncesini at
-    const appIndex = rawCode.search(/(?:function|const)\s+App/);
-    if (appIndex !== -1) {
-      rawCode = rawCode.substring(appIndex);
-    }
-
-    res.json({ code: rawCode });
+    // Kodun başındaki gereksiz açıklamaları at ve sanitize et
+    const sanitized = sanitizeReactCode(rawCode);
+    res.json({ code: sanitized });
   } catch (error: any) {
     console.error("App build error:", error);
     res.status(500).json({ error: error.message || "Uygulama inşası başarısız oldu" });
@@ -259,8 +333,9 @@ ${currentCode}
 KESİN KURALLAR:
 1. SADECE JavaScript/JSX kodunu ver. Kodun önüne veya arkasına hiçbir açıklama yazma.
 2. Kod "function App() {" ile başlamalı ve eksiksiz süslü parantez ile kapanmalıdır.
-3. Import veya export KULLANMA.
-4. Tailwind CSS sınıflarını kullan.`;
+3. ASLA import veya export yazma. React hook'ları (useState, useEffect, useMemo, useRef) doğrudan mevcuttur.
+4. Harici ikon kütüphaneleri (lucide-react vb.) IMPORT ETME. İkonlar için emojiler veya SVG kullan.
+5. Tailwind CSS sınıflarını kullan.`;
 
     let response = null;
     for (const modelName of priorityModels) {
@@ -270,12 +345,12 @@ KESİN KURALLAR:
           messages: [
             { 
               role: "system", 
-              content: "Sen sadece çalışan temiz JavaScript/JSX kodu üreten bir derleyicisin. Açıklama metni asla ekleme." 
+              content: "Sen sadece çalışan temiz JavaScript/JSX kodu üreten bir derleyicisin. Açıklama metni asla ekleme. Asla import veya export yazma." 
             },
             { role: "user", content: prompt }
           ],
           temperature: 0.3,
-          max_tokens: 6500
+          max_tokens: 4500
         });
         if (response?.choices?.[0]?.message?.content) {
           const raw = response.choices[0].message.content;
@@ -283,8 +358,8 @@ KESİN KURALLAR:
             break;
           }
         }
-      } catch (err) {
-        // sonraki modeli dene
+      } catch (err: any) {
+        console.error(`Groq modify error with ${modelName}:`, err?.message || err);
       }
     }
 
@@ -298,12 +373,8 @@ KESİN KURALLAR:
       rawCode = codeBlockMatch[1].trim();
     }
 
-    const appIndex = rawCode.search(/(?:function|const)\s+App/);
-    if (appIndex !== -1) {
-      rawCode = rawCode.substring(appIndex);
-    }
-
-    res.json({ updatedCode: rawCode });
+    const sanitized = sanitizeReactCode(rawCode);
+    res.json({ updatedCode: sanitized });
   } catch (error: any) {
     console.error("Modify app error:", error);
     res.status(500).json({ error: error.message || "Kod güncellenemedi" });

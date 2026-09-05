@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import JSZip from 'jszip';
 import { 
   Lightbulb, Loader2, Target, Zap, Clock, Code, DollarSign, 
@@ -392,28 +392,86 @@ export default function App() {
     localStorage.setItem('saas_builder_projects', JSON.stringify(filtered));
   };
 
+  // React kodunu temizleme ve import/export kalıntılarını arındırma fonksiyonu
+  const sanitizeReactCode = (code: string): string => {
+    if (!code) return "";
+
+    let cleaned = code
+      // Markdown bloklarını kaldır
+      .replace(/^```[a-zA-Z]*\n/gm, "")
+      .replace(/\n```$/gm, "")
+      .trim();
+
+    // 1. React importlarını React global nesnesine bağla
+    cleaned = cleaned.replace(
+      /import\s+React\s*,\s*\{([^}]+)\}\s+from\s+['"][^'"]+['"];?/g,
+      "const { $1 } = React;"
+    );
+    cleaned = cleaned.replace(
+      /import\s*\{([^}]+)\}\s+from\s+['"]react['"];?/g,
+      "const { $1 } = React;"
+    );
+    cleaned = cleaned.replace(
+      /import\s+React\s+from\s+['"]react['"];?/g,
+      "/* React global */"
+    );
+    cleaned = cleaned.replace(
+      /import\s+\*\s+as\s+React\s+from\s+['"]react['"];?/g,
+      "/* React global */"
+    );
+
+    // 2. Lucide veya ikon kütüphanesi importlarını Proxy'ye bağla
+    cleaned = cleaned.replace(
+      /import\s*\{([^}]+)\}\s+from\s+['"](?:lucide-react|react-icons[^'"]*)['"];?/g,
+      "const { $1 } = (window.LucideIcons || {});"
+    );
+
+    // 3. Çok satırlı veya tek satırlı kalan TÜM importları yok et
+    cleaned = cleaned.replace(
+      /\bimport\s+[\s\S]*?from\s*['"`][^'"`]+['"`]\s*;?/g,
+      ""
+    );
+    cleaned = cleaned.replace(
+      /\bimport\s*['"`][^'"`]+['"`]\s*;?/g,
+      ""
+    );
+    cleaned = cleaned.replace(
+      /^\s*import\b.*$/gm,
+      ""
+    );
+
+    // 4. Export ifadelerini App bileşenini hedefleyecek şekilde dönüştür
+    cleaned = cleaned.replace(
+      /export\s+default\s+function\s*(\w*)/g,
+      "function App"
+    );
+    cleaned = cleaned.replace(
+      /export\s+default\s+class\s*(\w*)/g,
+      "class App"
+    );
+    cleaned = cleaned.replace(
+      /export\s+default\s+([A-Za-z0-9_$]+)\s*;?/g,
+      "var App = $1;"
+    );
+    cleaned = cleaned.replace(
+      /export\s+default\s+[\s\S]*?;?/g,
+      ""
+    );
+    cleaned = cleaned.replace(
+      /export\s+{[^}]+};?/g,
+      ""
+    );
+    cleaned = cleaned.replace(
+      /export\s+(const|let|var|function|class)/g,
+      "$1"
+    );
+
+    return cleaned.trim();
+  };
+
   // Canlı Iframe Önizleme Kodu
   const getPreviewHtml = (code: string) => {
-    // Satır satır temizlik yaparak herhangi bir import/export ifadesini kesinlikle yok et
-    const lines = code.split('\n');
-    const cleanLines = lines.map(line => {
-      const trimmed = line.trim();
-      if (trimmed.startsWith('import ') || trimmed.startsWith('import{')) {
-        return '';
-      }
-      if (trimmed.startsWith('export default function')) {
-        return line.replace(/export\s+default\s+function\s*(\w*)/, 'function App');
-      }
-      if (trimmed.startsWith('export default')) {
-        return '';
-      }
-      if (trimmed.startsWith('export ')) {
-        return line.replace(/^export\s+/, '');
-      }
-      return line;
-    });
-
-    const cleanCode = cleanLines.join('\n');
+    const cleanCode = sanitizeReactCode(code);
     const codeJson = JSON.stringify(cleanCode);
 
     return `
@@ -432,14 +490,28 @@ export default function App() {
           <div id="root"></div>
           <div id="error-box" style="display:none; color:#b91c1c; background:#fef2f2; border:1px solid #fecaca; padding:16px; border-radius:12px; font-family:monospace; font-size:12px; white-space:pre-wrap;"></div>
           <script>
-            window.addEventListener('load', function() {
+            // Harici ikonlar için otomatik çökme koruması
+            window.LucideIcons = new Proxy({}, {
+              get: function(target, prop) {
+                return function LucideFallback(props) {
+                  return React.createElement('span', {
+                    className: 'inline-flex items-center justify-center ' + (props.className || ''),
+                    style: { display: 'inline-flex', verticalAlign: 'middle', fontSize: '1.1em' }
+                  }, '✦');
+                };
+              }
+            });
+
+            function executeApp() {
               try {
                 var codeToRun = ${codeJson};
                 if (!window.Babel) {
                   throw new Error('Babel derleyicisi yüklenemedi.');
                 }
                 var transformed = window.Babel.transform(
-                  "const { useState, useEffect, useMemo, useRef } = React;\\n" + codeToRun + "\\nif (typeof App !== 'undefined') { ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App)); }",
+                  "const { useState, useEffect, useMemo, useRef, useCallback } = React;\\n" +
+                  codeToRun +
+                  "\\nif (typeof App !== 'undefined') { ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App)); } else { document.getElementById('root').innerHTML = '<div class=\"p-4 text-amber-700 bg-amber-50 rounded-lg\">App bileşeni bulunamadı.</div>'; }",
                   { presets: ['react'] }
                 ).code;
                 
@@ -448,10 +520,16 @@ export default function App() {
                 var errBox = document.getElementById('error-box');
                 if (errBox) {
                   errBox.style.display = 'block';
-                  errBox.innerText = 'Çalışma/Derleme Hatası: ' + err.message;
+                  errBox.innerText = 'Çalışma Hatası: ' + err.message;
                 }
               }
-            });
+            }
+
+            if (document.readyState === 'loading') {
+              document.addEventListener('DOMContentLoaded', executeApp);
+            } else {
+              executeApp();
+            }
           </script>
         </body>
       </html>
