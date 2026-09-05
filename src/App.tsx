@@ -585,11 +585,12 @@ export default function App() {
                 var transformed = window.Babel.transform(
                   "const { useState, useEffect, useMemo, useRef, useCallback } = React;\\n" +
                   rawCode +
-                  "\\nif (typeof App === 'undefined') {\\n" +
+                  "\\nvar __fallbackComp = null;\\n" +
+                  "if (typeof App === 'undefined') {\\n" +
                   "  var _comps = [typeof Main !== 'undefined' ? Main : null, typeof SaaSApp !== 'undefined' ? SaaSApp : null, typeof Dashboard !== 'undefined' ? Dashboard : null].filter(Boolean);\\n" +
-                  "  if (_comps.length > 0) { var App = _comps[0]; }\\n" +
+                  "  if (_comps.length > 0) { __fallbackComp = _comps[0]; }\\n" +
                   "}\\n" +
-                  "return (typeof App !== 'undefined' ? App : null);",
+                  "return (typeof App !== 'undefined' ? App : __fallbackComp);",
                   { presets: ['react'] }
                 ).code;
 
