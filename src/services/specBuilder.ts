@@ -140,37 +140,47 @@ export async function buildAppHandler(req: Request, res: Response) {
       activeModels = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "gemma2-9b-it"];
     }
 
-    const prompt = `Sen dahi bir frontend yazılımcısısın. 
-Görevin: Aşağıda özellikleri ve şartnamesi verilen "${idea.title}" mikro-SaaS uygulaması için TEK DOSYALIK, TAMAMEN ÇALIŞAN, EKSİKSİZ, GÖZ ALICI bir React bileşeni kodu yazmak.
+    // Kod üretimi için en zeki modelleri önceliklendir (Llama 3.3 70B veya Llama 3.1 8B)
+    const priorityModels = [
+      "llama-3.3-70b-versatile",
+      "llama-3.1-8b-instant",
+      ...activeModels.filter(m => m !== "llama-3.3-70b-versatile" && m !== "llama-3.1-8b-instant")
+    ];
 
-Uygulama Bilgileri:
+    const prompt = `GÖREV: Aşağıdaki şartnameye göre "${idea.title}" mikro-SaaS uygulaması için TEK DOSYALIK, TAM ÇALIŞAN bir React fonksiyon bileşeni yaz.
+
+Şartname Özeti:
 Başlık: ${idea.title}
 Problem: ${idea.problem}
 Akışlar: ${JSON.stringify(spec.userFlows)}
 Ekranlar: ${JSON.stringify(spec.screens)}
 
 KESİN KURALLAR:
-1. Kod React 19 + Tailwind CSS uyumlu olmalıdır.
-2. Lucide ikonları veya standart SVG / emoji kullanılabilir. Harici kütüphane import etme!
-3. 'export default function App()' şeklinde tek bir ana bileşen döndür.
-4. Tamamen işlevsel olsun: Kullanıcı form doldurabilmeli, veri ekleyebilmeli, kayıtları listeleyebilmeli, filtreleyebilmeli ve canlı grafik/özet barları görebilmeli (React useState kullanarak in-memory çalışan gerçek bir mini-SaaS).
-5. Placeholder ('// kod buraya gelecek' gibi) ASLA bırakma! Eksiksiz, bitmiş kod olsun.
-6. Yanıt olarak YALNIZCA JavaScript/JSX kodunu ver. Kod blokları (\`\`\`jsx vb.) kullanma veya temizlenebilir şekilde ver.`;
+1. SADECE ÇALIŞAN KODU VER. Kesinlikle "İşte kodunuz:", "Özellikler şunlardır:" gibi hiçbir sohbet, açıklama veya Türkçe metin YAZMA.
+2. Kod "function App() {" ile başlamalı ve içinde formlar, state'ler, butonlar, tablo ve grafik/istatistikler içermelidir.
+3. Import veya export cümleleri KULLANMA. React hook'ları (useState, useEffect) doğrudan mevcuttur.
+4. Tailwind CSS sınıflarını kullan.`;
 
     let response = null;
-    for (const modelName of activeModels) {
+    for (const modelName of priorityModels) {
       try {
         response = await groq.chat.completions.create({
           model: modelName,
           messages: [
-            { role: "system", content: "Sen sadece çalışan temiz React bileşeni kodu üreten bir kod asistanısın. Açıklama metni ekleme." },
+            { 
+              role: "system", 
+              content: "Sen bir derleyicisin. Çıktın SADECE ve SADECE çalışan JavaScript/JSX kodu olmalıdır. Kodun önüne veya arkasına tek bir kelime bile açıklama yazma." 
+            },
             { role: "user", content: prompt }
           ],
-          temperature: 0.4,
+          temperature: 0.2,
           max_tokens: 4000
         });
         if (response?.choices?.[0]?.message?.content) {
-          break;
+          const raw = response.choices[0].message.content;
+          if (raw.includes("function App") || raw.includes("const App")) {
+            break;
+          }
         }
       } catch (err) {
         // sonraki modeli dene
@@ -181,10 +191,21 @@ KESİN KURALLAR:
       throw new Error("Uygulama kodu üretilemedi.");
     }
 
-    let code = response.choices[0].message.content.trim();
-    code = code.replace(/```(?:jsx|tsx|javascript|typescript)?\s*/gi, "").replace(/```\s*$/g, "").trim();
+    let rawCode = response.choices[0].message.content.trim();
+    
+    // Markdown kod blokları varsa içini al
+    const codeBlockMatch = rawCode.match(/```(?:jsx|tsx|javascript|typescript|js)?([\s\S]*?)```/);
+    if (codeBlockMatch) {
+      rawCode = codeBlockMatch[1].trim();
+    }
 
-    res.json({ code });
+    // Eğer model hala başta açıklama yaptıysa, "function App" veya "const App" öncesini at
+    const appIndex = rawCode.search(/(?:function|const)\s+App/);
+    if (appIndex !== -1) {
+      rawCode = rawCode.substring(appIndex);
+    }
+
+    res.json({ code: rawCode });
   } catch (error: any) {
     console.error("App build error:", error);
     res.status(500).json({ error: error.message || "Uygulama inşası başarısız oldu" });
