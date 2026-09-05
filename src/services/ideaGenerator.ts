@@ -263,8 +263,28 @@ Yanitini KESINLIKLE asagidaki JSON formatinda ver, disinda hicbir metin veya mar
           max_tokens: 4096,
         });
         if (response?.choices?.[0]?.message?.content) {
-          console.log(`Basarili model: ${modelName}`);
-          break;
+          const content = response.choices[0].message.content.trim();
+          // JSON parse etmeyi dene, basariliysa dur
+          try {
+            const firstBracket = content.indexOf('[');
+            const lastBracket = content.lastIndexOf(']');
+            const firstBrace = content.indexOf('{');
+            const lastBrace = content.lastIndexOf('}');
+            
+            let jsonString = content;
+            if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
+              jsonString = content.substring(firstBracket, lastBracket + 1);
+            } else if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+              jsonString = `[${content.substring(firstBrace, lastBrace + 1)}]`;
+            }
+            
+            JSON.parse(jsonString);
+            console.log(`Basarili model ve gecerli JSON: ${modelName}`);
+            break;
+          } catch (pe) {
+            console.warn(`Model ${modelName} gecerli JSON uretemedi, baska model deneniyor...`);
+            response = null;
+          }
         }
       } catch (err: any) {
         lastError = err;
@@ -273,12 +293,23 @@ Yanitini KESINLIKLE asagidaki JSON formatinda ver, disinda hicbir metin veya mar
     }
 
     if (!response || !response.choices?.[0]?.message?.content) {
-      throw new Error(`Tum Groq modelleri basarisiz oldu: ${lastError?.message || "Bilinmeyen hata"}`);
+      throw new Error(`Gecerli JSON ureten bir Groq modeli bulunamadi: ${lastError?.message || "Bilinmeyen hata"}`);
     }
 
-    const rawText = response.choices[0].message.content;
-    const cleanedText = rawText.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
-    const ideas = JSON.parse(cleanedText);
+    const content = response.choices[0].message.content.trim();
+    const firstBracket = content.indexOf('[');
+    const lastBracket = content.lastIndexOf(']');
+    const firstBrace = content.indexOf('{');
+    const lastBrace = content.lastIndexOf('}');
+    
+    let jsonString = content;
+    if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
+      jsonString = content.substring(firstBracket, lastBracket + 1);
+    } else if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      jsonString = `[${content.substring(firstBrace, lastBrace + 1)}]`;
+    }
+
+    const ideas = JSON.parse(jsonString);
 
     res.json({
       ideas: Array.isArray(ideas) ? ideas : [ideas],
