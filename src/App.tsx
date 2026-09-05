@@ -395,9 +395,18 @@ export default function App() {
   // Canlı Iframe Önizleme Kodu
   const getPreviewHtml = (code: string) => {
     let cleanCode = code
-      .replace(/import\s+[\s\S]*?from\s+['"].*?['"];?/g, '')
-      .replace(/export\s+default\s+function\s*(\w*)/g, 'function App')
-      .replace(/export\s+default\s+\w+;?/g, '');
+      // import ... from '...'
+      .replace(/import\s+[\s\S]*?from\s+['"].*?['"];?/gi, '')
+      // import '...' veya import "..." (yan etkili css/paket importları)
+      .replace(/import\s+['"].*?['"];?/gi, '')
+      // export default function ...
+      .replace(/export\s+default\s+function\s*(\w*)/gi, 'function App')
+      // export default ...
+      .replace(/export\s+default\s+[\s\S]*?;?/gi, '')
+      // export { ... }
+      .replace(/export\s+{[^}]+};?/gi, '')
+      // export const / let / var
+      .replace(/export\s+(const|let|var|function)/gi, '$1');
 
     const codeJson = JSON.stringify(cleanCode);
 
