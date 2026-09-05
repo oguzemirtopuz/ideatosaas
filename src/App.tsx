@@ -394,20 +394,26 @@ export default function App() {
 
   // Canlı Iframe Önizleme Kodu
   const getPreviewHtml = (code: string) => {
-    let cleanCode = code
-      // import ... from '...'
-      .replace(/import\s+[\s\S]*?from\s+['"].*?['"];?/gi, '')
-      // import '...' veya import "..." (yan etkili css/paket importları)
-      .replace(/import\s+['"].*?['"];?/gi, '')
-      // export default function ...
-      .replace(/export\s+default\s+function\s*(\w*)/gi, 'function App')
-      // export default ...
-      .replace(/export\s+default\s+[\s\S]*?;?/gi, '')
-      // export { ... }
-      .replace(/export\s+{[^}]+};?/gi, '')
-      // export const / let / var
-      .replace(/export\s+(const|let|var|function)/gi, '$1');
+    // Satır satır temizlik yaparak herhangi bir import/export ifadesini kesinlikle yok et
+    const lines = code.split('\n');
+    const cleanLines = lines.map(line => {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('import ') || trimmed.startsWith('import{')) {
+        return '';
+      }
+      if (trimmed.startsWith('export default function')) {
+        return line.replace(/export\s+default\s+function\s*(\w*)/, 'function App');
+      }
+      if (trimmed.startsWith('export default')) {
+        return '';
+      }
+      if (trimmed.startsWith('export ')) {
+        return line.replace(/^export\s+/, '');
+      }
+      return line;
+    });
 
+    const cleanCode = cleanLines.join('\n');
     const codeJson = JSON.stringify(cleanCode);
 
     return `
@@ -434,7 +440,7 @@ export default function App() {
                 }
                 var transformed = window.Babel.transform(
                   "const { useState, useEffect, useMemo, useRef } = React;\\n" + codeToRun + "\\nif (typeof App !== 'undefined') { ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App)); }",
-                  { presets: ['react', 'env'] }
+                  { presets: ['react'] }
                 ).code;
                 
                 new Function(transformed)();
