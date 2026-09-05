@@ -156,10 +156,10 @@ Akışlar: ${JSON.stringify(spec.userFlows)}
 Ekranlar: ${JSON.stringify(spec.screens)}
 
 KESİN KURALLAR:
-1. SADECE ÇALIŞAN KODU VER. Kesinlikle "İşte kodunuz:", "Özellikler şunlardır:" gibi hiçbir sohbet, açıklama veya Türkçe metin YAZMA.
-2. Kod "function App() {" ile başlamalı ve içinde formlar, state'ler, butonlar, tablo ve grafik/istatistikler içermelidir.
+1. SADECE ÇALIŞAN KODU VER. Kesinlikle hiçbir sohbet, açıklama veya Türkçe metin YAZMA.
+2. Kod "function App() {" ile başlamalı ve SÜSLÜ PARANTEZ İLE KUSURSUZCA KAPANMALIDIR (KOD ASLA YARIDA KESİLMEMELİ).
 3. Import veya export cümleleri KULLANMA. React hook'ları (useState, useEffect) doğrudan mevcuttur.
-4. Tailwind CSS sınıflarını kullan.`;
+4. Kompakt, temiz, hatasız Tailwind CSS kullan. Gereksiz uzun tekrarlardan kaçınarak bileşeni tam ve eksiksiz bitir.`;
 
     let response = null;
     for (const modelName of priorityModels) {
@@ -169,16 +169,16 @@ KESİN KURALLAR:
           messages: [
             { 
               role: "system", 
-              content: "Sen bir derleyicisin. Çıktın SADECE ve SADECE çalışan JavaScript/JSX kodu olmalıdır. Kodun önüne veya arkasına tek bir kelime bile açıklama yazma." 
+              content: "Sen bir derleyicisin. Çıktın SADECE çalışan, bitmiş, tam kapatılmış JavaScript/JSX kodu olmalıdır. Kod asla yarıda kesilmemelidir." 
             },
             { role: "user", content: prompt }
           ],
           temperature: 0.2,
-          max_tokens: 4000
+          max_tokens: 6500
         });
         if (response?.choices?.[0]?.message?.content) {
           const raw = response.choices[0].message.content;
-          if (raw.includes("function App") || raw.includes("const App")) {
+          if (raw.includes("function App") && raw.trim().endsWith("}")) {
             break;
           }
         }

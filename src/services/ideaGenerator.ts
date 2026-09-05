@@ -180,7 +180,7 @@ export async function generateIdeasHandler(req: Request, res: Response) {
 
 "${customIdea}"
 
-Bu fikri analiz et ve sifir maliyetle (Next.js/Vite, Supabase free tier, Vercel free tier) 1 gunde kurulabilecek bir mikro-SaaS / arac olarak detaylandir.
+Bu fikri analiz et ve sifir maliyetle (Next.js/Vite, Supabase free tier, Vercel free tier) 1 gunde kurulabilecek bir mikro-SaaS / arac olarak detaylandir. Fikre gercek, yaratici, akilda kalici bir SaaS urun adi ver (Asla "Application Name" veya "Uygulama Adi" gibi jenerik baslik koyma!).
 
 Su kriterlere gore 10 uzerinden puanla:
 1. Aci yogunlugu (pain)
@@ -191,7 +191,7 @@ Su kriterlere gore 10 uzerinden puanla:
 Yanitini KESINLIKLE asagidaki JSON formatinda ver, disinda hicbir metin veya markdown kullanma:
 [
   {
-    "title": "Uygulama Adi",
+    "title": "PetTrack (Gercek Urun Adi)",
     "problem": "1-2 cumle ile problem tanimi",
     "targetUser": "Hedef kullanici",
     "alternatives": "Mevcut alternatifler ve neden yetersizler",
@@ -203,7 +203,7 @@ Yanitini KESINLIKLE asagidaki JSON formatinda ver, disinda hicbir metin veya mar
   }
 ]`;
     } else {
-      prompt = `Sen kidemli bir full-stack muhendis ve urun stratejistisin. Gorevin, ASAGIDAKI GERCEK PIYASA SINYALLERINI temel alarak sifir maliyetle (Next.js/Vite, Supabase free tier, Vercel free tier) 1 gunde kurulabilecek tam 3 adet mikro-SaaS / arac fikri uretmek. Fikirleri kendi kafandan degil, kesinlikle bu sinyallere dayanarak uretmelisin.
+      prompt = `Sen kidemli bir full-stack muhendis ve urun stratejistisin. Gorevin, ASAGIDAKI GERCEK PIYASA SINYALLERINI temel alarak sifir maliyetle (Next.js/Vite, Supabase free tier, Vercel free tier) 1 gunde kurulabilecek tam 3 adet mikro-SaaS / arac fikri uretmek. Her fikre gercek, yaratici bir marka/SaaS adi ver (Asla "Application Name", "Uygulama Adi" gibi jenerik kalip kullanma!).
 
 Reddit Sikayetleri/Fikirleri: ${JSON.stringify(redditData)}
 Google Trends (Bugun): ${JSON.stringify(trendData)}
@@ -217,7 +217,7 @@ Her fikri su kriterlere gore 10 uzerinden puanla:
 Yanitini KESINLIKLE asagidaki JSON formatinda ver, disinda hicbir metin veya markdown kullanma:
 [
   {
-    "title": "Uygulama Adi",
+    "title": "FeedbackPulse (Gercek Urun Adi)",
     "problem": "1-2 cumle ile problem tanimi",
     "targetUser": "Hedef kullanici",
     "alternatives": "Mevcut alternatifler ve neden yetersizler",
