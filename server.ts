@@ -4,7 +4,7 @@ import path from "path";
 import express from "express";
 
 async function startServer() {
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   // Vite middleware for development (AI Studio)
   if (process.env.NODE_ENV !== "production") {

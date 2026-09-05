@@ -581,20 +581,23 @@ export default function App() {
                   return EB;
                 })();
 
-                // Babel ile JSX'i derle
+                window.__CurrentApp = null;
+
+                // Babel ile JSX'i derle (top-level return kullanmadan)
                 var transformed = window.Babel.transform(
                   "const { useState, useEffect, useMemo, useRef, useCallback } = React;\\n" +
                   rawCode +
-                  "\\nvar __fallbackComp = null;\\n" +
-                  "if (typeof App === 'undefined') {\\n" +
-                  "  var _comps = [typeof Main !== 'undefined' ? Main : null, typeof SaaSApp !== 'undefined' ? SaaSApp : null, typeof Dashboard !== 'undefined' ? Dashboard : null].filter(Boolean);\\n" +
-                  "  if (_comps.length > 0) { __fallbackComp = _comps[0]; }\\n" +
-                  "}\\n" +
-                  "return (typeof App !== 'undefined' ? App : __fallbackComp);",
+                  "\\nvar _candidate = null;\\n" +
+                  "if (typeof App !== 'undefined') { _candidate = App; }\\n" +
+                  "else if (typeof Main !== 'undefined') { _candidate = Main; }\\n" +
+                  "else if (typeof SaaSApp !== 'undefined') { _candidate = SaaSApp; }\\n" +
+                  "else if (typeof Dashboard !== 'undefined') { _candidate = Dashboard; }\\n" +
+                  "window.__CurrentApp = _candidate;",
                   { presets: ['react'] }
                 ).code;
 
-                var ResolvedApp = new Function(transformed)();
+                new Function(transformed)();
+                var ResolvedApp = window.__CurrentApp;
 
                 var loader = document.getElementById('loading-state');
                 if (loader) loader.style.display = 'none';
