@@ -257,6 +257,29 @@ export function sanitizeReactCode(code: string): string {
     }
   }
 
+  // 6. Düzensiz React.createElement props düzeltmeleri (onClick()=> veya onClick(e)=> -> onClick: () =>)
+  cleaned = cleaned.replace(
+    /([,{]\s*)([a-zA-Z0-9_$]+)\s*\(([^)]*)\)\s*=>/g,
+    "$1$2: ($3) =>"
+  );
+
+  // 7. Düzensiz JSX attribute formatlarını düzelt (onClick={() => ...} -> onClick: () => ...)
+  cleaned = cleaned.replace(
+    /([,{]\s*)([a-zA-Z0-9_$]+)\s*=\s*\{(?=\s*\()/g,
+    "$1$2: "
+  );
+
+  // 8. Dengesiz parantez ve süslüleri otomatik dengele
+  let openP = 0, openB = 0;
+  for (const char of cleaned) {
+    if (char === '(') openP++;
+    else if (char === ')') openP--;
+    else if (char === '{') openB++;
+    else if (char === '}') openB--;
+  }
+  while (openP > 0) { cleaned += ')'; openP--; }
+  while (openB > 0) { cleaned += '\n}'; openB--; }
+
   return cleaned.trim();
 }
 
@@ -364,7 +387,8 @@ KESİN KURALLAR:
 2. Kod "function App() {" ile başlamalı ve SÜSLÜ PARANTEZ İLE KUSURSUZCA KAPANMALIDIR (KOD ASLA YARIDA KESİLMEMELİ).
 3. ASLA import veya export yazma. React hook'ları (useState, useEffect, useMemo, useRef) doğrudan mevcuttur.
 4. Harici ikon kütüphaneleri (lucide-react vb.) IMPORT ETME. İkonlar için emojiler (✨, 🚀, ⚡, 📊, ⚙️, 🔍, 💡, 🎯 vb.) veya SVG kullan.
-5. Kompakt, temiz, hatasız Tailwind CSS kullan. Gereksiz uzun tekrarlardan kaçınarak bileşeni tam ve eksiksiz bitir.`;
+5. STANDART DOĞAL REACT JSX KULLAN: Kesinlikle 'React.createElement' KULLANMA! Doğrudan standart JSX etiketleri yaz (örn: <div className="...">, <button onClick={() => setView('dashboard')}> vb.).
+6. Okunabilir, satır satır ve temiz girintili JSX yaz (minified tek satır yazma). Tailwind CSS sınıflarını kullan.`;
 
     let response = null;
     for (const modelName of priorityModels) {
@@ -374,7 +398,7 @@ KESİN KURALLAR:
           messages: [
             { 
               role: "system", 
-              content: "Sen bir derleyicisin. Çıktın SADECE çalışan, bitmiş, tam kapatılmış JavaScript/JSX kodu olmalıdır. Asla import/export yazma. Kod asla yarıda kesilmemelidir." 
+              content: "Sen kıdemli bir React mühendisisin. Kodunu standart, modern, temiz React JSX formatında yaz (<div>, <button onClick={...}>). Kesinlikle React.createElement YAZMA; daima doğal JSX etiketleri kullan. Asla import veya export yazma. Kodun sonunu süslü parantez ile eksiksiz kapat." 
             },
             { role: "user", content: prompt }
           ],
@@ -475,15 +499,16 @@ KESİN KURALLAR:
 // AI Chat: Kullanıcı İstemi ile Kodu Canlı Güncelleme Handler'ı
 export async function modifyAppWithPromptHandler(req: Request, res: Response) {
   try {
-    const apiKey = process.env.GROQ_API_KEY;
-    if (!apiKey) {
-      res.status(500).json({ error: "GROQ_API_KEY bulunamadı." });
-      return;
-    }
-
     const { currentCode, userPrompt, ideaTitle } = req.body;
     if (!currentCode || !userPrompt) {
       res.status(400).json({ error: "Mevcut kod ve kullanıcı isteği gerekli." });
+      return;
+    }
+
+    const apiKey = process.env.GROQ_API_KEY;
+    if (!apiKey) {
+      console.warn("GROQ_API_KEY bulunamadı, mevcut kod korunarak yanıt veriliyor.");
+      res.json({ updatedCode: sanitizeReactCode(currentCode) });
       return;
     }
 
@@ -521,7 +546,8 @@ KESİN KURALLAR:
 2. Kod "function App() {" ile başlamalı ve eksiksiz süslü parantez ile kapanmalıdır.
 3. ASLA import veya export yazma. React hook'ları (useState, useEffect, useMemo, useRef) doğrudan mevcuttur.
 4. Harici ikon kütüphaneleri (lucide-react vb.) IMPORT ETME. İkonlar için emojiler veya SVG kullan.
-5. Tailwind CSS sınıflarını kullan.`;
+5. STANDART DOĞAL REACT JSX KULLAN: Kesinlikle 'React.createElement' KULLANMA! Doğrudan standart JSX etiketleri (<div className="...">, <button onClick={...}>) yaz.
+6. Tailwind CSS sınıflarını kullan.`;
 
     let response = null;
     for (const modelName of priorityModels) {
@@ -531,7 +557,7 @@ KESİN KURALLAR:
           messages: [
             { 
               role: "system", 
-              content: "Sen sadece çalışan temiz JavaScript/JSX kodu üreten bir derleyicisin. Açıklama metni asla ekleme. Asla import veya export yazma." 
+              content: "Sen uzman bir React geliştiricisisin. Çıktın sadece temiz, standart React JSX kodu olmalıdır. Kesinlikle React.createElement yazma, doğrudan doğal JSX etiketleri kullan. Açıklama metni asla ekleme. Asla import veya export yazma." 
             },
             { role: "user", content: prompt }
           ],

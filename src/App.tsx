@@ -474,6 +474,29 @@ export default function App() {
       }
     }
 
+    // 6. Düzensiz React.createElement props düzeltmeleri (onClick()=> veya onClick(e)=> -> onClick: () =>)
+    cleaned = cleaned.replace(
+      /([,{]\s*)([a-zA-Z0-9_$]+)\s*\(([^)]*)\)\s*=>/g,
+      "$1$2: ($3) =>"
+    );
+
+    // 7. Düzensiz JSX attribute formatlarını düzelt (onClick={() => ...} -> onClick: () => ...)
+    cleaned = cleaned.replace(
+      /([,{]\s*)([a-zA-Z0-9_$]+)\s*=\s*\{(?=\s*\()/g,
+      "$1$2: "
+    );
+
+    // 8. Dengesiz parantez ve süslüleri otomatik dengele
+    let openP = 0, openB = 0;
+    for (const char of cleaned) {
+      if (char === '(') openP++;
+      else if (char === ')') openP--;
+      else if (char === '{') openB++;
+      else if (char === '}') openB--;
+    }
+    while (openP > 0) { cleaned += ')'; openP--; }
+    while (openB > 0) { cleaned += '\n}'; openB--; }
+
     return cleaned.trim();
   };
 
@@ -537,6 +560,38 @@ export default function App() {
                 };
               }
             });
+
+            // Supabase API çağrıları için otomatik sahte servis (ReferenceError ve crash koruması)
+            window.supabase = {
+              auth: {
+                getUser: async function() { return { data: { user: { id: 'demo-user-1', email: 'demo@saas.com' } }, error: null }; },
+                getSession: async function() { return { data: { session: {} }, error: null }; },
+                signInWithPassword: async function() { return { data: { user: { id: 'demo-user-1' } }, error: null }; },
+                signUp: async function() { return { data: { user: { id: 'demo-user-1' } }, error: null }; },
+                signOut: async function() { return { error: null }; },
+                deleteUser: async function() { return { error: null }; },
+                onAuthStateChange: function() { return { data: { subscription: { unsubscribe: function() {} } } }; }
+              },
+              from: function(tableName) {
+                var chain = {
+                  select: function() { return chain; },
+                  insert: function() { return chain; },
+                  update: function() { return chain; },
+                  delete: function() { return chain; },
+                  eq: function() { return chain; },
+                  neq: function() { return chain; },
+                  gt: function() { return chain; },
+                  lt: function() { return chain; },
+                  order: function() { return chain; },
+                  limit: function() { return chain; },
+                  single: function() { return Promise.resolve({ data: {}, error: null }); },
+                  then: function(onSuccess, onError) {
+                    return Promise.resolve({ data: [], error: null }).then(onSuccess, onError);
+                  }
+                };
+                return chain;
+              }
+            };
 
             var attempts = 0;
             function checkAndRun() {
