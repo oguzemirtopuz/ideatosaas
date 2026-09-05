@@ -40,58 +40,42 @@ function extractTitlesFromRSS(xml: string): string[] {
   return titles;
 }
 
-// Reddit verilerini cek (once RSS, fallback olarak JSON)
+// Canli startup, SaaS ve aci noktasi sinyallerini topla (Reddit + Hacker News SaaS/Show HN)
 async function fetchRedditSignals(): Promise<FetchResult> {
-  const subreddits = ["SaaS", "Entrepreneur", "somebodymakethis", "SideProject", "smallbusiness"];
+  const sources = [
+    { name: "HackerNews-SaaS", url: "https://hnrss.org/newest?q=SaaS" },
+    { name: "HackerNews-ShowHN", url: "https://hnrss.org/show" },
+    { name: "Reddit-SaaS", url: "https://www.reddit.com/r/SaaS/new.rss?limit=5" },
+    { name: "Reddit-Entrepreneur", url: "https://www.reddit.com/r/Entrepreneur/new.rss?limit=5" }
+  ];
+  
   let allPosts: string[] = [];
   const errors: string[] = [];
 
-  for (const sub of subreddits) {
-    // Once RSS dene (rate-limit'e daha az takilir)
+  for (const src of sources) {
     try {
-      const rssRes = await fetch(`https://www.reddit.com/r/${sub}/new.rss?limit=5`, {
-        headers: { "User-Agent": "IdeaPipelineBot/1.0 (RSS Reader)" },
-        signal: AbortSignal.timeout(8000),
+      const res = await fetch(src.url, {
+        headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) StartupSignalBot/1.0" },
+        signal: AbortSignal.timeout(6000),
       });
 
-      if (rssRes.ok) {
-        const xml = await rssRes.text();
+      if (res.ok) {
+        const xml = await res.text();
         const posts = extractTitlesFromRSS(xml);
         if (posts.length > 0) {
           allPosts = allPosts.concat(posts.slice(0, 5));
-          continue; // Bu subreddit basarili, sonrakine gec
-        }
-      }
-    } catch (_e) {
-      // RSS basarisiz, JSON'a dus
-    }
-
-    // RSS basarisiz olduysa JSON dene
-    try {
-      const jsonRes = await fetch(`https://www.reddit.com/r/${sub}/new.json?limit=5`, {
-        headers: { "User-Agent": "IdeaPipelineBot/1.0" },
-        signal: AbortSignal.timeout(8000),
-      });
-
-      if (jsonRes.ok) {
-        const json = await jsonRes.json();
-        if (json?.data?.children) {
-          const posts = json.data.children.map(
-            (c: any) => `${c.data.title} - ${c.data.selftext?.substring(0, 150) || ""}`
-          );
-          allPosts = allPosts.concat(posts);
         }
       } else {
-        errors.push(`r/${sub}: HTTP ${jsonRes.status}`);
+        errors.push(`${src.name}: HTTP ${res.status}`);
       }
     } catch (e: any) {
-      errors.push(`r/${sub}: ${e.message}`);
+      errors.push(`${src.name}: ${e.message}`);
     }
   }
 
   return {
     success: allPosts.length > 0,
-    source: "reddit",
+    source: "market-signals",
     data: allPosts,
     error: errors.length > 0 ? errors.join("; ") : undefined,
   };

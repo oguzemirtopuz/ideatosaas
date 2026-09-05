@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import JSZip from 'jszip';
 import { 
   Lightbulb, Loader2, Target, Zap, Clock, Code, DollarSign, 
   CheckCircle2, AlertTriangle, FileText, ArrowRight, ArrowLeft, 
   Layers, Hammer, Eye, Play, Sparkles, Check, Download, ExternalLink,
-  TrendingUp, BarChart3, Users, DollarSign as CashIcon
+  TrendingUp, BarChart3, Users, DollarSign as CashIcon, Archive
 } from 'lucide-react';
 
 interface IdeaScore {
@@ -186,6 +187,46 @@ export default function App() {
       setError(e.message);
     } finally {
       setMarketingLoading(false);
+    }
+  };
+
+  // Sayfa ilk açıldığında otomatik olarak 3 fikri aramaya başla
+  useEffect(() => {
+    generateIdeas();
+  }, []);
+
+  // Aşama 3: Tek Tıkla Tam ZIP Paketi İndirme
+  const downloadZipArchive = async () => {
+    if (!builtCode || !selectedIdea || !spec) return;
+    try {
+      const zip = new JSZip();
+      const slug = selectedIdea.title.toLowerCase().replace(/[^a-z0-9]/g, '-');
+
+      // 1. SPEC.md dosyasını ekle
+      const specMd = `# ${spec.title}\n\n> ${spec.tagline}\n\n## Kullanıcı Akışları\n${spec.userFlows.map(f => `- ${f}`).join('\n')}\n\n## Veri Modeli\n${spec.dataModel.map(m => `- **${m.table}**: ${m.description}`).join('\n')}\n\n## Ekranlar\n${spec.screens.map(s => `- ${s}`).join('\n')}\n\n## Kapsam Dışı\n${spec.outOfScope.map(o => `- ${o}`).join('\n')}`;
+      zip.file("SPEC.md", specMd);
+
+      // 2. Çalışan HTML uygulamasını ekle
+      const htmlContent = getPreviewHtml(builtCode);
+      zip.file("index.html", htmlContent);
+
+      // 3. Kaynak React dosyasını ekle
+      zip.file("App.jsx", builtCode);
+
+      // 4. README.md ekle
+      const readme = `# ${selectedIdea.title}\n\n${selectedIdea.problem}\n\n## Nasıl Çalıştırılır?\n1. \`index.html\` dosyasına çift tıklayarak doğrudan tarayıcınızda açabilirsiniz.\n2. Veya Vercel / Netlify üzerine bu klasörü sürükleyip anında canlıya alabilirsiniz.`;
+      zip.file("README.md", readme);
+
+      // ZIP oluştur ve indir
+      const content = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(content);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${slug}-proje-paketi.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert("ZIP oluşturulurken hata: " + err.message);
     }
   };
 
@@ -519,18 +560,26 @@ export default function App() {
                         <div className="bg-neutral-50 border border-neutral-200 p-5 rounded-xl flex flex-col justify-between space-y-4">
                           <div>
                             <h4 className="font-bold text-sm text-neutral-900 mb-1 flex items-center gap-2">
-                              <Download className="w-4 h-4 text-neutral-700" /> Tek Tıkla İndir
+                              <Archive className="w-4 h-4 text-neutral-700" /> Tam ZIP Paketi İndir
                             </h4>
                             <p className="text-xs text-neutral-500 leading-relaxed">
-                              Tüm React, Tailwind CSS ve çalışma mantığını barındıran tek parça bağımsız `.html` dosyasını bilgisayarınıza indirin. Her yerde anında açılır.
+                              İçinde \`SPEC.md\`, \`index.html\`, \`App.jsx\` ve \`README.md\` dosyalarını barındıran tam proje ZIP arşivini indirin.
                             </p>
                           </div>
-                          <button
-                            onClick={downloadStandaloneProject}
-                            className="w-full py-2.5 bg-neutral-900 text-white rounded-lg text-xs font-semibold hover:bg-neutral-800 transition-colors flex items-center justify-center gap-1.5 shadow-sm"
-                          >
-                            <Download className="w-3.5 h-3.5" /> Uygulama Paketini İndir
-                          </button>
+                          <div className="space-y-2">
+                            <button
+                              onClick={downloadZipArchive}
+                              className="w-full py-2.5 bg-neutral-900 text-white rounded-lg text-xs font-semibold hover:bg-neutral-800 transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+                            >
+                              <Archive className="w-3.5 h-3.5" /> Tüm Projeyi ZIP Olarak İndir
+                            </button>
+                            <button
+                              onClick={downloadStandaloneProject}
+                              className="w-full py-2 bg-white border border-neutral-200 text-neutral-700 rounded-lg text-xs font-medium hover:bg-neutral-100 transition-colors flex items-center justify-center gap-1.5"
+                            >
+                              <Download className="w-3.5 h-3.5" /> Sadece HTML Dosyası İndir
+                            </button>
+                          </div>
                         </div>
 
                         <div className="bg-neutral-50 border border-neutral-200 p-5 rounded-xl flex flex-col justify-between space-y-4">
