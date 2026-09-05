@@ -4,7 +4,8 @@ import {
   Lightbulb, Loader2, Target, Zap, Clock, Code, DollarSign, 
   CheckCircle2, AlertTriangle, FileText, ArrowRight, ArrowLeft, 
   Layers, Hammer, Eye, Play, Sparkles, Check, Download, ExternalLink,
-  TrendingUp, BarChart3, Users, DollarSign as CashIcon, Archive
+  TrendingUp, BarChart3, Users, Archive, Send, MessageSquare, 
+  UserCheck, History, Trash2, FolderGit2
 } from 'lucide-react';
 
 interface IdeaScore {
@@ -59,7 +60,41 @@ interface MarketingDecision {
   };
 }
 
+interface ChatMessage {
+  sender: 'user' | 'ai';
+  text: string;
+  timestamp: string;
+}
+
+interface SavedProject {
+  id: string;
+  createdAt: string;
+  idea: Idea;
+  spec: AppSpec;
+  code: string;
+  chatHistory: ChatMessage[];
+}
+
 export default function App() {
+  // Kullanıcı ve Oturum Yönetimi
+  const [userEmail, setUserEmail] = useState<string>(() => {
+    return localStorage.getItem('saas_builder_user') || '';
+  });
+  const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
+  const [inputEmail, setInputEmail] = useState<string>('');
+
+  // Proje Geçmişi
+  const [savedProjects, setSavedProjects] = useState<SavedProject[]>(() => {
+    try {
+      const saved = localStorage.getItem('saas_builder_projects');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [showHistoryModal, setShowHistoryModal] = useState<boolean>(false);
+
+  // Aşama 1: Fikir Motoru
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [rawSignals, setRawSignals] = useState<RawSignals | null>(null);
@@ -76,9 +111,60 @@ export default function App() {
   const [builtCode, setBuiltCode] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'spec' | 'preview' | 'code' | 'deploy' | 'marketing'>('spec');
 
+  // AI Canlı Refine Chat
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState<string>('');
+  const [modifyingCode, setModifyingCode] = useState<boolean>(false);
+
   // Aşama 4 & 5: Pazarlama ve Karar Motoru
   const [marketingData, setMarketingData] = useState<MarketingDecision | null>(null);
   const [marketingLoading, setMarketingLoading] = useState(false);
+
+  // İlk Açılışta Otomatik 3 Fikir Getir
+  useEffect(() => {
+    generateIdeas();
+  }, []);
+
+  // Projeyi otomatik kaydet
+  useEffect(() => {
+    if (selectedIdea && spec && builtCode) {
+      setSavedProjects(prev => {
+        const existingIndex = prev.findIndex(p => p.idea.title === selectedIdea.title);
+        const updatedProject: SavedProject = {
+          id: existingIndex !== -1 ? prev[existingIndex].id : Date.now().toString(),
+          createdAt: existingIndex !== -1 ? prev[existingIndex].createdAt : new Date().toLocaleString('tr-TR'),
+          idea: selectedIdea,
+          spec,
+          code: builtCode,
+          chatHistory: chatMessages
+        };
+
+        let newProjects: SavedProject[];
+        if (existingIndex !== -1) {
+          newProjects = [...prev];
+          newProjects[existingIndex] = updatedProject;
+        } else {
+          newProjects = [updatedProject, ...prev];
+        }
+        localStorage.setItem('saas_builder_projects', JSON.stringify(newProjects));
+        return newProjects;
+      });
+    }
+  }, [builtCode, chatMessages]);
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (inputEmail.trim()) {
+      localStorage.setItem('saas_builder_user', inputEmail.trim());
+      setUserEmail(inputEmail.trim());
+      setShowAuthModal(false);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('saas_builder_user');
+    setUserEmail('');
+  };
 
   const generateIdeas = async () => {
     setLoading(true);
@@ -90,6 +176,7 @@ export default function App() {
     setSpec(null);
     setBuiltCode(null);
     setMarketingData(null);
+    setChatMessages([]);
     
     try {
       const body = customIdea.trim() ? { customIdea: customIdea.trim() } : undefined;
@@ -124,6 +211,7 @@ export default function App() {
     setSpec(null);
     setBuiltCode(null);
     setMarketingData(null);
+    setChatMessages([]);
     setActiveTab('spec');
     setSpecLoading(true);
     setError(null);
@@ -160,10 +248,65 @@ export default function App() {
       if (!res.ok) throw new Error(data.error || 'Uygulama kodu üretilemedi');
       setBuiltCode(data.code);
       setActiveTab('preview');
+      setChatMessages([
+        {
+          sender: 'ai',
+          text: `"${selectedIdea.title}" uygulamasını şartnameye göre inşa ettim! Beğenmediğin bir yer veya eklemek istediğin bir özellik varsa bana yazabilirsin.`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }
+      ]);
     } catch (e: any) {
       setError(e.message);
     } finally {
       setBuildLoading(false);
+    }
+  };
+
+  // AI Canlı Kod Düzenleme (Chat Refine)
+  const handleSendPromptModification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatInput.trim() || !builtCode || modifyingCode) return;
+
+    const userText = chatInput.trim();
+    setChatInput('');
+    const userMsg: ChatMessage = {
+      sender: 'user',
+      text: userText,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+
+    setChatMessages(prev => [...prev, userMsg]);
+    setModifyingCode(true);
+
+    try {
+      const res = await fetch('/api/modify-app', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          currentCode: builtCode,
+          userPrompt: userText,
+          ideaTitle: selectedIdea?.title
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Kod güncellenemedi');
+
+      setBuiltCode(data.updatedCode);
+      const aiMsg: ChatMessage = {
+        sender: 'ai',
+        text: `İsteğin doğrultusunda kodu güncelledim ve canlı uygulamaya yansıttım! 🚀`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      setChatMessages(prev => [...prev, aiMsg]);
+    } catch (err: any) {
+      const errorMsg: ChatMessage = {
+        sender: 'ai',
+        text: `Üzgünüm, güncelleme sırasında bir hata oluştu: ${err.message}`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      setChatMessages(prev => [...prev, errorMsg]);
+    } finally {
+      setModifyingCode(false);
     }
   };
 
@@ -190,34 +333,23 @@ export default function App() {
     }
   };
 
-  // Sayfa ilk açıldığında otomatik olarak 3 fikri aramaya başla
-  useEffect(() => {
-    generateIdeas();
-  }, []);
-
   // Aşama 3: Tek Tıkla Tam ZIP Paketi İndirme
-  const downloadZipArchive = async () => {
-    if (!builtCode || !selectedIdea || !spec) return;
+  const downloadZipArchive = async (targetIdea = selectedIdea, targetSpec = spec, targetCode = builtCode) => {
+    if (!targetCode || !targetIdea || !targetSpec) return;
     try {
       const zip = new JSZip();
-      const slug = selectedIdea.title.toLowerCase().replace(/[^a-z0-9]/g, '-');
+      const slug = targetIdea.title.toLowerCase().replace(/[^a-z0-9]/g, '-');
 
-      // 1. SPEC.md dosyasını ekle
-      const specMd = `# ${spec.title}\n\n> ${spec.tagline}\n\n## Kullanıcı Akışları\n${spec.userFlows.map(f => `- ${f}`).join('\n')}\n\n## Veri Modeli\n${spec.dataModel.map(m => `- **${m.table}**: ${m.description}`).join('\n')}\n\n## Ekranlar\n${spec.screens.map(s => `- ${s}`).join('\n')}\n\n## Kapsam Dışı\n${spec.outOfScope.map(o => `- ${o}`).join('\n')}`;
+      const specMd = `# ${targetSpec.title}\n\n> ${targetSpec.tagline}\n\n## Kullanıcı Akışları\n${targetSpec.userFlows.map(f => `- ${f}`).join('\n')}\n\n## Veri Modeli\n${targetSpec.dataModel.map(m => `- **${m.table}**: ${m.description}`).join('\n')}\n\n## Ekranlar\n${targetSpec.screens.map(s => `- ${s}`).join('\n')}\n\n## Kapsam Dışı\n${targetSpec.outOfScope.map(o => `- ${o}`).join('\n')}`;
       zip.file("SPEC.md", specMd);
 
-      // 2. Çalışan HTML uygulamasını ekle
-      const htmlContent = getPreviewHtml(builtCode);
+      const htmlContent = getPreviewHtml(targetCode);
       zip.file("index.html", htmlContent);
+      zip.file("App.jsx", targetCode);
 
-      // 3. Kaynak React dosyasını ekle
-      zip.file("App.jsx", builtCode);
-
-      // 4. README.md ekle
-      const readme = `# ${selectedIdea.title}\n\n${selectedIdea.problem}\n\n## Nasıl Çalıştırılır?\n1. \`index.html\` dosyasına çift tıklayarak doğrudan tarayıcınızda açabilirsiniz.\n2. Veya Vercel / Netlify üzerine bu klasörü sürükleyip anında canlıya alabilirsiniz.`;
+      const readme = `# ${targetIdea.title}\n\n${targetIdea.problem}\n\n## Nasıl Çalıştırılır?\n1. \`index.html\` dosyasına çift tıklayarak doğrudan tarayıcınızda açabilirsiniz.\n2. Veya Vercel / Netlify üzerine bu klasörü sürükleyip anında canlıya alabilirsiniz.`;
       zip.file("README.md", readme);
 
-      // ZIP oluştur ve indir
       const content = await zip.generateAsync({ type: "blob" });
       const url = URL.createObjectURL(content);
       const a = document.createElement('a');
@@ -230,7 +362,6 @@ export default function App() {
     }
   };
 
-  // Aşama 3: Tek Tıkla Bağımsız HTML/React Dosyası İndirme
   const downloadStandaloneProject = () => {
     if (!builtCode || !selectedIdea) return;
     const htmlContent = getPreviewHtml(builtCode);
@@ -243,7 +374,25 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
-  // Kodun canlı iframe önizlemesi için HTML üretimi
+  // Geçmiş projeyi geri yükleme
+  const restoreProject = (p: SavedProject) => {
+    setSelectedIdea(p.idea);
+    setSpec(p.spec);
+    setBuiltCode(p.code);
+    setChatMessages(p.chatHistory || []);
+    setActiveTab('preview');
+    setShowHistoryModal(false);
+  };
+
+  // Proje geçmişinden silme
+  const deleteProject = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const filtered = savedProjects.filter(p => p.id !== id);
+    setSavedProjects(filtered);
+    localStorage.setItem('saas_builder_projects', JSON.stringify(filtered));
+  };
+
+  // Canlı Iframe Önizleme Kodu
   const getPreviewHtml = (code: string) => {
     let cleanCode = code
       .replace(/import\s+[\s\S]*?from\s+['"].*?['"];?/g, '')
@@ -291,7 +440,7 @@ export default function App() {
     <div className="min-h-screen bg-neutral-50 text-neutral-900 font-sans pb-24">
       <div className="max-w-6xl mx-auto px-6 py-8">
         
-        {/* Üst Başlık & 5 Aşamalı Durum Barı */}
+        {/* Üst Başlık, Kullanıcı Profili ve Proje Geçmişi */}
         <div className="flex flex-col md:flex-row md:items-center justify-between pb-6 mb-8 border-b border-neutral-200 gap-4">
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-neutral-900 text-white rounded-xl shadow-sm">
@@ -303,23 +452,38 @@ export default function App() {
             </div>
           </div>
 
-          {/* 5 Aşama İlerleme Göstergesi */}
-          <div className="flex items-center gap-1.5 overflow-x-auto text-[11px] font-semibold pb-1">
-            <span className={`px-2.5 py-1 rounded-full whitespace-nowrap ${!selectedIdea ? 'bg-neutral-900 text-white' : 'bg-green-100 text-green-800'}`}>
-              1. Fikir {selectedIdea && <Check className="w-3 h-3 inline ml-0.5" />}
-            </span>
-            <ArrowRight className="w-3 h-3 text-neutral-300 shrink-0" />
-            <span className={`px-2.5 py-1 rounded-full whitespace-nowrap ${selectedIdea && !builtCode ? 'bg-neutral-900 text-white' : builtCode ? 'bg-green-100 text-green-800' : 'bg-neutral-200 text-neutral-500'}`}>
-              2. Spec {builtCode && <Check className="w-3 h-3 inline ml-0.5" />}
-            </span>
-            <ArrowRight className="w-3 h-3 text-neutral-300 shrink-0" />
-            <span className={`px-2.5 py-1 rounded-full whitespace-nowrap ${builtCode && !marketingData ? 'bg-neutral-900 text-white' : marketingData ? 'bg-green-100 text-green-800' : 'bg-neutral-200 text-neutral-500'}`}>
-              3. Build & Deploy {builtCode && <Check className="w-3 h-3 inline ml-0.5" />}
-            </span>
-            <ArrowRight className="w-3 h-3 text-neutral-300 shrink-0" />
-            <span className={`px-2.5 py-1 rounded-full whitespace-nowrap ${marketingData ? 'bg-neutral-900 text-white' : 'bg-neutral-200 text-neutral-500'}`}>
-              4. Marketing & 5. Karar
-            </span>
+          <div className="flex items-center gap-2">
+            {/* Proje Geçmişi Butonu */}
+            <button
+              onClick={() => setShowHistoryModal(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-neutral-200 rounded-lg text-xs font-semibold text-neutral-700 hover:bg-neutral-50 transition-colors shadow-sm"
+            >
+              <History className="w-3.5 h-3.5 text-neutral-600" />
+              Kayıtlı Projeler ({savedProjects.length})
+            </button>
+
+            {/* Kullanıcı Giriş / Hesap */}
+            {userEmail ? (
+              <div className="flex items-center gap-2 bg-white border border-neutral-200 px-3 py-1.5 rounded-lg shadow-sm text-xs">
+                <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                <span className="font-semibold text-neutral-800">{userEmail}</span>
+                <button
+                  onClick={handleLogout}
+                  className="text-neutral-400 hover:text-red-600 ml-1 text-[11px]"
+                  title="Çıkış Yap"
+                >
+                  Çıkış
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowAuthModal(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-neutral-900 text-white rounded-lg text-xs font-semibold hover:bg-neutral-800 transition-colors shadow-sm"
+              >
+                <UserCheck className="w-3.5 h-3.5" />
+                Hesap Oluştur / Giriş
+              </button>
+            )}
           </div>
         </div>
 
@@ -374,7 +538,7 @@ export default function App() {
                     className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-colors text-xs shadow-sm disabled:opacity-50"
                   >
                     {marketingLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <TrendingUp className="w-3.5 h-3.5" />}
-                    {marketingLoading ? 'Analiz Ediliyor...' : 'Aşama 4 & 5: Reklam & CAC Kararını Çalıştır'}
+                    {marketingLoading ? 'Analiz Ediliyor...' : 'Reklam & CAC Kararını Çalıştır'}
                   </button>
                 )}
               </div>
@@ -411,7 +575,7 @@ export default function App() {
                           activeTab === 'preview' ? 'bg-white text-neutral-900 shadow-sm border border-neutral-200' : 'text-neutral-500 hover:text-neutral-900'
                         }`}
                       >
-                        <Eye className="w-3.5 h-3.5 text-green-600" /> 2. Canlı Uygulama
+                        <Eye className="w-3.5 h-3.5 text-green-600" /> 2. Canlı Uygulama & AI Chat
                       </button>
                     )}
                     {builtCode && (
@@ -421,7 +585,7 @@ export default function App() {
                           activeTab === 'deploy' ? 'bg-white text-neutral-900 shadow-sm border border-neutral-200' : 'text-neutral-500 hover:text-neutral-900'
                         }`}
                       >
-                        <ExternalLink className="w-3.5 h-3.5 text-blue-600" /> 3. Deploy & Dışa Aktar
+                        <ExternalLink className="w-3.5 h-3.5 text-blue-600" /> 3. Deploy & ZIP İndir
                       </button>
                     )}
                     {builtCode && (
@@ -529,16 +693,76 @@ export default function App() {
                     </div>
                   )}
 
-                  {/* TAB 2: CANLI ÖNİZLEME */}
+                  {/* TAB 2: CANLI ÖNİZLEME & AI CHAT REFACTOR PANELİ */}
                   {activeTab === 'preview' && builtCode && (
-                    <div className="space-y-3">
-                      <div className="border border-neutral-200 rounded-xl overflow-hidden bg-white shadow-inner h-[650px]">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                      {/* Sol: Canlı Uygulama Iframe */}
+                      <div className="lg:col-span-2 border border-neutral-200 rounded-xl overflow-hidden bg-white shadow-inner h-[650px]">
                         <iframe
                           title="App Sandbox"
                           srcDoc={getPreviewHtml(builtCode)}
                           className="w-full h-full border-0"
                           sandbox="allow-scripts allow-modals allow-forms"
                         />
+                      </div>
+
+                      {/* Sağ: Canlı AI Asistan / Değişiklik İste Chat Paneli */}
+                      <div className="flex flex-col h-[650px] bg-neutral-50 border border-neutral-200 rounded-xl overflow-hidden shadow-sm">
+                        <div className="p-3.5 border-b border-neutral-200 bg-white flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <MessageSquare className="w-4 h-4 text-indigo-600" />
+                            <h4 className="text-xs font-bold text-neutral-900">AI Değişiklik Asistanı</h4>
+                          </div>
+                          <span className="text-[10px] px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full font-bold">Canlı Refactor</span>
+                        </div>
+
+                        {/* Mesaj Listesi */}
+                        <div className="flex-1 p-3.5 overflow-y-auto space-y-3 text-xs">
+                          {chatMessages.map((msg, idx) => (
+                            <div
+                              key={idx}
+                              className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}
+                            >
+                              <div
+                                className={`p-3 rounded-xl max-w-[88%] leading-relaxed ${
+                                  msg.sender === 'user'
+                                    ? 'bg-neutral-900 text-white rounded-br-none'
+                                    : 'bg-white border border-neutral-200 text-neutral-800 rounded-bl-none shadow-xs'
+                                }`}
+                              >
+                                {msg.text}
+                              </div>
+                              <span className="text-[9px] text-neutral-400 mt-1 px-1">{msg.timestamp}</span>
+                            </div>
+                          ))}
+                          {modifyingCode && (
+                            <div className="flex items-center gap-2 bg-white border border-neutral-200 p-2.5 rounded-xl text-neutral-600 text-xs shadow-xs">
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600" />
+                              <span>Kod güncelleniyor ve canlıya yansıtılıyor...</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* İstem Girişi Formu */}
+                        <form onSubmit={handleSendPromptModification} className="p-3 border-t border-neutral-200 bg-white">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={chatInput}
+                              onChange={(e) => setChatInput(e.target.value)}
+                              placeholder="Örn: Arka planı koyu yap, yeni buton ekle..."
+                              disabled={modifyingCode}
+                              className="flex-1 px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-xs placeholder:text-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-900"
+                            />
+                            <button
+                              type="submit"
+                              disabled={modifyingCode || !chatInput.trim()}
+                              className="p-2 bg-neutral-900 text-white rounded-lg hover:bg-neutral-800 disabled:opacity-40 transition-colors shrink-0"
+                            >
+                              <Send className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </form>
                       </div>
                     </div>
                   )}
@@ -552,7 +776,7 @@ export default function App() {
                         </div>
                         <h3 className="text-lg font-bold text-neutral-900">Aşama 3: Deploy & Dışa Aktarma</h3>
                         <p className="text-xs text-neutral-500">
-                          Üretilen bu çalışan mikro-SaaS uygulamasını ister tek bir bağımsız dosya olarak indirin, ister Vercel / Netlify'a yükleyin.
+                          Üretilen bu çalışan mikro-SaaS uygulamasını ister tek bir bağımsız dosya veya tam ZIP olarak indirin, ister Vercel / Netlify'a yükleyin.
                         </p>
                       </div>
 
@@ -563,12 +787,12 @@ export default function App() {
                               <Archive className="w-4 h-4 text-neutral-700" /> Tam ZIP Paketi İndir
                             </h4>
                             <p className="text-xs text-neutral-500 leading-relaxed">
-                              İçinde \`SPEC.md\`, \`index.html\`, \`App.jsx\` ve \`README.md\` dosyalarını barındıran tam proje ZIP arşivini indirin.
+                              İçinde `SPEC.md`, `index.html`, `App.jsx` ve `README.md` dosyalarını barındıran tam proje ZIP arşivini indirin.
                             </p>
                           </div>
                           <div className="space-y-2">
                             <button
-                              onClick={downloadZipArchive}
+                              onClick={() => downloadZipArchive()}
                               className="w-full py-2.5 bg-neutral-900 text-white rounded-lg text-xs font-semibold hover:bg-neutral-800 transition-colors flex items-center justify-center gap-1.5 shadow-sm"
                             >
                               <Archive className="w-3.5 h-3.5" /> Tüm Projeyi ZIP Olarak İndir
@@ -726,7 +950,7 @@ export default function App() {
                 Fikir Motoru
               </h2>
               <p className="text-base text-neutral-500 max-w-2xl mx-auto">
-                Reddit ve Pazar trendlerini tarar, sıfır maliyetle 1 günde kurulabilecek mikro-SaaS fırsatlarını tespit eder.
+                Canlı startup sinyallerini tarar, sıfır maliyetle 1 günde kurulabilecek mikro-SaaS fırsatlarını tespit eder.
               </p>
               
               <button 
@@ -739,7 +963,7 @@ export default function App() {
                 ) : (
                   <Lightbulb className="w-4 h-4" />
                 )}
-                {loading && !customIdea.trim() ? 'Sinyaller Analiz Ediliyor...' : 'Yeni Fikirler Üret (3 Adet)'}
+                {loading && !customIdea.trim() ? 'Sinyaller Taranıyor...' : 'Yeni Fikirler Üret (3 Adet)'}
               </button>
 
               <div className="mt-6 max-w-2xl mx-auto">
@@ -778,6 +1002,45 @@ export default function App() {
                 <ul className="list-disc pl-5 space-y-1 text-xs">
                   {warnings.map((w, i) => <li key={i}>{w}</li>)}
                 </ul>
+              </div>
+            )}
+
+            {rawSignals && ideas.length > 0 && (
+              <div className="mb-8 max-w-4xl mx-auto">
+                <button 
+                  onClick={() => setShowRaw(!showRaw)}
+                  className="flex items-center gap-2 text-xs font-semibold text-neutral-600 hover:text-neutral-900 transition-colors mx-auto bg-white border border-neutral-200 px-3.5 py-1.5 rounded-full shadow-sm"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  {showRaw ? 'Ham Sinyalleri Gizle' : 'Kullanılan Ham Sinyalleri Gör'}
+                </button>
+                
+                {showRaw && (
+                  <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-left">
+                    <div className="bg-white border border-neutral-200 rounded-xl p-3.5 shadow-sm h-52 overflow-y-auto">
+                      <h4 className="font-bold text-[11px] uppercase tracking-wider text-neutral-400 mb-2 sticky top-0 bg-white pb-1 border-b border-neutral-100">
+                        Canlı Piyasa Sinyalleri ({rawSignals.reddit.length})
+                      </h4>
+                      <ul className="space-y-2 text-xs text-neutral-700">
+                        {rawSignals.reddit.map((r, i) => (
+                          <li key={i} className="pb-2 border-b border-neutral-50 last:border-0">{r}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className="bg-white border border-neutral-200 rounded-xl p-3.5 shadow-sm h-52 overflow-y-auto">
+                      <h4 className="font-bold text-[11px] uppercase tracking-wider text-neutral-400 mb-2 sticky top-0 bg-white pb-1 border-b border-neutral-100">
+                        Pazar Trendleri ({rawSignals.trends.length})
+                      </h4>
+                      <div className="flex flex-wrap gap-1.5">
+                        {rawSignals.trends.map((t, i) => (
+                          <span key={i} className="bg-neutral-100 text-neutral-700 px-2.5 py-0.5 rounded text-xs border border-neutral-200">
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -867,6 +1130,114 @@ export default function App() {
             </div>
           </div>
         )}
+
+        {/* MODAL 1: HESAP OLUŞTURMA / GİRİŞ */}
+        {showAuthModal && (
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-neutral-200">
+              <h3 className="text-lg font-bold text-neutral-900 mb-1">Hesap / Profil</h3>
+              <p className="text-xs text-neutral-500 mb-4">
+                Projeleriniz ve AI sohbet geçmişiniz bu e-posta profiline otomatik kaydedilir.
+              </p>
+              <form onSubmit={handleLogin} className="space-y-3">
+                <input
+                  type="email"
+                  value={inputEmail}
+                  onChange={(e) => setInputEmail(e.target.value)}
+                  placeholder="eposta@ornek.com"
+                  required
+                  className="w-full px-3.5 py-2.5 border border-neutral-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-neutral-900"
+                />
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowAuthModal(false)}
+                    className="flex-1 py-2 border border-neutral-200 rounded-xl text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
+                  >
+                    Vazgeç
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-2 bg-neutral-900 text-white rounded-xl text-xs font-semibold hover:bg-neutral-800"
+                  >
+                    Kaydet & Giriş
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL 2: KAYITLI PROJELER VE SOHBET GEÇMİŞİ */}
+        {showHistoryModal && (
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl p-6 max-w-2xl w-full shadow-2xl border border-neutral-200 max-h-[80vh] flex flex-col">
+              <div className="flex items-center justify-between border-b border-neutral-200 pb-3 mb-4">
+                <div>
+                  <h3 className="text-lg font-bold text-neutral-900">Kayıtlı Projeler & Geçmiş</h3>
+                  <p className="text-xs text-neutral-500">Önceki ürettiğiniz uygulamalar, AI sohbetleri ve ZIP exportları.</p>
+                </div>
+                <button
+                  onClick={() => setShowHistoryModal(false)}
+                  className="text-neutral-400 hover:text-neutral-900 text-sm font-bold p-1"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto space-y-3">
+                {savedProjects.length === 0 ? (
+                  <div className="text-center py-12 text-neutral-400 text-xs">
+                    Henüz kaydedilmiş bir proje bulunmuyor. Yeni bir fikir inşa ettiğinizde burada listelenecektir.
+                  </div>
+                ) : (
+                  savedProjects.map((p) => (
+                    <div
+                      key={p.id}
+                      onClick={() => restoreProject(p)}
+                      className="bg-neutral-50 hover:bg-neutral-100/80 border border-neutral-200 p-4 rounded-xl flex items-center justify-between cursor-pointer transition-colors"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-bold text-sm text-neutral-900">{p.idea.title}</h4>
+                          <span className="text-[10px] px-2 py-0.5 bg-white border border-neutral-200 rounded-full font-bold text-neutral-600">
+                            {p.idea.totalScore}/40 Puan
+                          </span>
+                        </div>
+                        <p className="text-xs text-neutral-500 line-clamp-1">{p.idea.problem}</p>
+                        <div className="text-[10px] text-neutral-400 flex items-center gap-3 pt-1">
+                          <span>📅 {p.createdAt}</span>
+                          <span>💬 {p.chatHistory?.length || 0} AI Sohbet Mesajı</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            downloadZipArchive(p.idea, p.spec, p.code);
+                          }}
+                          className="p-2 bg-white border border-neutral-200 hover:bg-neutral-200/80 rounded-lg text-neutral-700 text-xs font-semibold shadow-xs"
+                          title="ZIP İndir"
+                        >
+                          <Archive className="w-3.5 h-3.5 text-neutral-700" />
+                        </button>
+                        <button
+                          onClick={(e) => deleteProject(p.id, e)}
+                          className="p-2 bg-white border border-neutral-200 hover:bg-red-50 hover:text-red-600 rounded-lg text-neutral-400 text-xs shadow-xs"
+                          title="Sil"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );

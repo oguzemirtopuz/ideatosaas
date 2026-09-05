@@ -1,6 +1,6 @@
 import express from "express";
 import { generateIdeasHandler } from "./services/ideaGenerator.js";
-import { generateSpecHandler, buildAppHandler } from "./services/specBuilder.js";
+import { generateSpecHandler, buildAppHandler, modifyAppWithPromptHandler } from "./services/specBuilder.js";
 import { generateMarketingAndDecisionHandler } from "./services/marketingDecision.js";
 
 const app = express();
@@ -18,6 +18,7 @@ app.get("/api/test", (req, res) => {
 app.post("/api/generate-ideas", generateIdeasHandler);
 app.post("/api/generate-spec", generateSpecHandler);
 app.post("/api/build-app", buildAppHandler);
+app.post("/api/modify-app", modifyAppWithPromptHandler);
 app.post("/api/generate-marketing-decision", generateMarketingAndDecisionHandler);
 
 export default app;

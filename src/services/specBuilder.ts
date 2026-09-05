@@ -211,3 +211,91 @@ KESİN KURALLAR:
     res.status(500).json({ error: error.message || "Uygulama inşası başarısız oldu" });
   }
 }
+
+// AI Chat: Kullanıcı İstemi ile Kodu Canlı Güncelleme Handler'ı
+export async function modifyAppWithPromptHandler(req: Request, res: Response) {
+  try {
+    const apiKey = process.env.GROQ_API_KEY;
+    if (!apiKey) {
+      res.status(500).json({ error: "GROQ_API_KEY bulunamadı." });
+      return;
+    }
+
+    const { currentCode, userPrompt, ideaTitle } = req.body;
+    if (!currentCode || !userPrompt) {
+      res.status(400).json({ error: "Mevcut kod ve kullanıcı isteği gerekli." });
+      return;
+    }
+
+    const groq = new Groq({ apiKey });
+
+    const priorityModels = [
+      "llama-3.3-70b-versatile",
+      "llama-3.1-8b-instant"
+    ];
+
+    const prompt = `GÖREV: Aşağıda "${ideaTitle || 'Uygulama'}" mikro-SaaS'ının mevcut React kodu ve kullanıcının istediği değişiklik yer alıyor.
+Mevcut koddaki çalışan özellikleri BOZMADAN, kullanıcının istediği değişikliği kusursuzca uygula ve güncellenmiş TEK DOSYALIK React bileşenini döndür.
+
+Kullanıcının İsteği:
+"${userPrompt}"
+
+Mevcut Kod:
+\`\`\`jsx
+${currentCode}
+\`\`\`
+
+KESİN KURALLAR:
+1. SADECE ÇALIŞAN KODU VER. Kesinlikle hiçbir sohbet, açıklama veya Türkçe metin YAZMA.
+2. Kod "function App() {" ile başlamalı ve SÜSLÜ PARANTEZ İLE KUSURSUZCA KAPANMALIDIR.
+3. Import veya export cümleleri KULLANMA. React hook'ları (useState, useEffect) doğrudan mevcuttur.
+4. Tailwind CSS kullan.`;
+
+    let response = null;
+    for (const modelName of priorityModels) {
+      try {
+        response = await groq.chat.completions.create({
+          model: modelName,
+          messages: [
+            { 
+              role: "system", 
+              content: "Sen bir React refactor derleyicisisin. Çıktın SADECE ve SADECE güncellenmiş çalışan JavaScript/JSX kodu olmalıdır. Kodun önüne veya arkasına tek bir kelime açıklama yazma." 
+            },
+            { role: "user", content: prompt }
+          ],
+          temperature: 0.2,
+          max_tokens: 6500
+        });
+        if (response?.choices?.[0]?.message?.content) {
+          const raw = response.choices[0].message.content;
+          if (raw.includes("function App") && raw.trim().endsWith("}")) {
+            break;
+          }
+        }
+      } catch (err) {
+        // sonraki modeli dene
+      }
+    }
+
+    if (!response || !response.choices?.[0]?.message?.content) {
+      throw new Error("Kod güncellenemedi.");
+    }
+
+    let rawCode = response.choices[0].message.content.trim();
+    const codeBlockMatch = rawCode.match(/```(?:jsx|tsx|javascript|typescript|js)?([\s\S]*?)```/);
+    if (codeBlockMatch) {
+      rawCode = codeBlockMatch[1].trim();
+    }
+
+    const appIndex = rawCode.search(/(?:function|const)\s+App/);
+    if (appIndex !== -1) {
+      rawCode = rawCode.substring(appIndex);
+    }
+
+    res.json({ updatedCode: rawCode });
+  } catch (error: any) {
+    console.error("Modify app error:", error);
+    res.status(500).json({ error: error.message || "Kod güncellenemedi" });
+  }
+}
+
