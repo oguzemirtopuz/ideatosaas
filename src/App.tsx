@@ -32,6 +32,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showRaw, setShowRaw] = useState(false);
+  const [customIdea, setCustomIdea] = useState('');
 
   const generateIdeas = async () => {
     setLoading(true);
@@ -41,7 +42,12 @@ export default function App() {
     setShowRaw(false);
     
     try {
-      const response = await fetch('/api/generate-ideas', { method: 'POST' });
+      const body = customIdea.trim() ? { customIdea: customIdea.trim() } : undefined;
+      const response = await fetch('/api/generate-ideas', { 
+        method: 'POST',
+        headers: body ? { 'Content-Type': 'application/json' } : undefined,
+        body: body ? JSON.stringify(body) : undefined
+      });
       const data = await response.json();
       
       if (!response.ok) {
@@ -81,17 +87,44 @@ export default function App() {
           </p>
           
           <button 
-            onClick={generateIdeas}
+            onClick={() => { setCustomIdea(''); generateIdeas(); }}
             disabled={loading}
             className="mt-6 inline-flex items-center gap-2 px-6 py-3 bg-neutral-900 text-white rounded-full font-medium hover:bg-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
           >
-            {loading ? (
+            {loading && !customIdea.trim() ? (
               <Loader2 className="w-5 h-5 animate-spin" />
             ) : (
               <Lightbulb className="w-5 h-5" />
             )}
-            {loading ? 'Sinyaller Analiz Ediliyor...' : 'Yeni Fikirler Üret'}
+            {loading && !customIdea.trim() ? 'Sinyaller Analiz Ediliyor...' : 'Yeni Fikirler Üret'}
           </button>
+
+          <div className="mt-8 max-w-2xl mx-auto">
+            <div className="bg-white border border-neutral-200 rounded-2xl p-5 shadow-sm">
+              <h3 className="text-sm font-semibold text-neutral-500 uppercase tracking-wider mb-3">
+                veya kendi fikrini yaz
+              </h3>
+              <textarea
+                value={customIdea}
+                onChange={(e) => setCustomIdea(e.target.value)}
+                placeholder="Örn: Küçük işletmeler için randevu takip uygulaması, müşteriler SMS ile hatırlatma alsın..."
+                className="w-full h-24 px-4 py-3 bg-neutral-50 border border-neutral-200 rounded-xl text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent resize-none"
+                disabled={loading}
+              />
+              <button
+                onClick={generateIdeas}
+                disabled={loading || !customIdea.trim()}
+                className="mt-3 w-full inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-neutral-100 text-neutral-900 rounded-xl font-medium hover:bg-neutral-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-sm"
+              >
+                {loading && customIdea.trim() ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Zap className="w-4 h-4" />
+                )}
+                {loading && customIdea.trim() ? 'Fikir Analiz Ediliyor...' : 'Bu Fikri Analiz Et'}
+              </button>
+            </div>
+          </div>
         </header>
 
         {error && (
