@@ -229,13 +229,24 @@ export async function modifyAppWithPromptHandler(req: Request, res: Response) {
 
     const groq = new Groq({ apiKey });
 
+    let activeModels: string[] = [];
+    try {
+      const modelList = await groq.models.list();
+      activeModels = modelList.data
+        .filter((m: any) => m.active && !m.id.includes("whisper") && !m.id.includes("guard"))
+        .map((m: any) => m.id);
+    } catch (e) {
+      activeModels = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "gemma2-9b-it"];
+    }
+
     const priorityModels = [
       "llama-3.3-70b-versatile",
-      "llama-3.1-8b-instant"
+      "llama-3.1-8b-instant",
+      ...activeModels.filter(m => m !== "llama-3.3-70b-versatile" && m !== "llama-3.1-8b-instant")
     ];
 
-    const prompt = `GÖREV: Aşağıda "${ideaTitle || 'Uygulama'}" mikro-SaaS'ının mevcut React kodu ve kullanıcının istediği değişiklik yer alıyor.
-Mevcut koddaki çalışan özellikleri BOZMADAN, kullanıcının istediği değişikliği kusursuzca uygula ve güncellenmiş TEK DOSYALIK React bileşenini döndür.
+    const prompt = `Sen uzman bir React yazılımcısısın.
+GÖREV: Aşağıdaki "${ideaTitle || 'Uygulama'}" mikro-SaaS React kodunu, kullanıcının isteğine göre güncelle ve YENİ ÇALIŞAN KODU VER.
 
 Kullanıcının İsteği:
 "${userPrompt}"
@@ -246,10 +257,10 @@ ${currentCode}
 \`\`\`
 
 KESİN KURALLAR:
-1. SADECE ÇALIŞAN KODU VER. Kesinlikle hiçbir sohbet, açıklama veya Türkçe metin YAZMA.
-2. Kod "function App() {" ile başlamalı ve SÜSLÜ PARANTEZ İLE KUSURSUZCA KAPANMALIDIR.
-3. Import veya export cümleleri KULLANMA. React hook'ları (useState, useEffect) doğrudan mevcuttur.
-4. Tailwind CSS kullan.`;
+1. SADECE JavaScript/JSX kodunu ver. Kodun önüne veya arkasına hiçbir açıklama yazma.
+2. Kod "function App() {" ile başlamalı ve eksiksiz süslü parantez ile kapanmalıdır.
+3. Import veya export KULLANMA.
+4. Tailwind CSS sınıflarını kullan.`;
 
     let response = null;
     for (const modelName of priorityModels) {
@@ -259,16 +270,16 @@ KESİN KURALLAR:
           messages: [
             { 
               role: "system", 
-              content: "Sen bir React refactor derleyicisisin. Çıktın SADECE ve SADECE güncellenmiş çalışan JavaScript/JSX kodu olmalıdır. Kodun önüne veya arkasına tek bir kelime açıklama yazma." 
+              content: "Sen sadece çalışan temiz JavaScript/JSX kodu üreten bir derleyicisin. Açıklama metni asla ekleme." 
             },
             { role: "user", content: prompt }
           ],
-          temperature: 0.2,
+          temperature: 0.3,
           max_tokens: 6500
         });
         if (response?.choices?.[0]?.message?.content) {
           const raw = response.choices[0].message.content;
-          if (raw.includes("function App") && raw.trim().endsWith("}")) {
+          if (raw.includes("App")) {
             break;
           }
         }
