@@ -147,12 +147,16 @@ export default function App() {
   };
 
   // Kodun canlı iframe önizlemesi için HTML üretimi
+  // Kodun canlı iframe önizlemesi için HTML üretimi
   const getPreviewHtml = (code: string) => {
-    // import ve export temizleme
+    // import ve export ifadelerini temizle
     let cleanCode = code
-      .replace(/import\s+.*?from\s+['"].*?['"];?/g, '')
-      .replace(/export\s+default\s+function\s+(\w+)/g, 'function App')
+      .replace(/import\s+[\s\S]*?from\s+['"].*?['"];?/g, '')
+      .replace(/export\s+default\s+function\s*(\w*)/g, 'function App')
       .replace(/export\s+default\s+\w+;?/g, '');
+
+    // Güvenli JSON string olarak koda gömme (özel karakter patlamalarını önlemek için)
+    const codeJson = JSON.stringify(cleanCode);
 
     return `
       <!DOCTYPE html>
@@ -161,35 +165,27 @@ export default function App() {
           <meta charset="utf-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1" />
           <script src="https://cdn.tailwindcss.com"></script>
-          <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-          <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-          <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+          <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+          <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+          <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.10/babel.min.js"></script>
           <style>body { font-family: system-ui, -apple-system, sans-serif; }</style>
         </head>
         <body class="bg-neutral-50 p-4">
           <div id="root"></div>
-          <div id="error-display" style="display:none; color:red; background:#fee; padding:16px; border-radius:8px; font-family:monospace; white-space:pre-wrap;"></div>
+          <div id="error-box" style="display:none; color:#b91c1c; background:#fef2f2; border:1px solid #fecaca; padding:16px; border-radius:12px; font-family:monospace; font-size:12px; white-space:pre-wrap;"></div>
           <script>
-            window.onerror = function(msg, url, line, col, error) {
-              var errDiv = document.getElementById('error-display');
-              errDiv.style.display = 'block';
-              errDiv.innerText = 'Çalışma Zamanı Hatası: ' + msg + '\\nSatır: ' + line;
-            };
-          </script>
-          <script type="text/babel">
             try {
-              const { useState, useEffect, useMemo, useRef } = React;
-              ${cleanCode}
+              const codeToRun = ${codeJson};
+              const transformed = Babel.transform(
+                "const { useState, useEffect, useMemo, useRef } = React;\\n" + codeToRun + "\\nif (typeof App !== 'undefined') { ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App)); }",
+                { presets: ['react'] }
+              ).code;
               
-              if (typeof App !== 'undefined') {
-                ReactDOM.createRoot(document.getElementById('root')).render(<App />);
-              } else {
-                document.getElementById('error-display').style.display = 'block';
-                document.getElementById('error-display').innerText = 'Hata: Ana bileşen (App) bulunamadı.';
-              }
+              new Function(transformed)();
             } catch (err) {
-              document.getElementById('error-display').style.display = 'block';
-              document.getElementById('error-display').innerText = 'Derleme Hatası: ' + err.message;
+              const errBox = document.getElementById('error-box');
+              errBox.style.display = 'block';
+              errBox.innerText = 'Çalışma Hatası: ' + err.message;
             }
           </script>
         </body>
