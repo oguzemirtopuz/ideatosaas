@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { 
   Lightbulb, Loader2, Target, Zap, Clock, Code, DollarSign, 
   CheckCircle2, AlertTriangle, FileText, ArrowRight, ArrowLeft, 
-  Layers, Hammer, Eye, Play, Sparkles, Check
+  Layers, Hammer, Eye, Play, Sparkles, Check, Download, ExternalLink,
+  TrendingUp, BarChart3, Users, DollarSign as CashIcon
 } from 'lucide-react';
 
 interface IdeaScore {
@@ -39,6 +40,24 @@ interface AppSpec {
   buildChecklist: string[];
 }
 
+interface MarketingDecision {
+  channel: string;
+  adCopy: {
+    headline: string;
+    body: string;
+    callToAction: string;
+  };
+  setupChecklist: string[];
+  simulation: {
+    testBudget: number;
+    visitors: number;
+    conversions: number;
+    cac: number;
+    decision: string;
+    decisionNote: string;
+  };
+}
+
 export default function App() {
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
@@ -48,14 +67,17 @@ export default function App() {
   const [showRaw, setShowRaw] = useState(false);
   const [customIdea, setCustomIdea] = useState('');
 
-  // Aşama 2 Durumları
+  // Aşama 2: Spec & Build
   const [selectedIdea, setSelectedIdea] = useState<Idea | null>(null);
   const [spec, setSpec] = useState<AppSpec | null>(null);
   const [specLoading, setSpecLoading] = useState(false);
   const [buildLoading, setBuildLoading] = useState(false);
   const [builtCode, setBuiltCode] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'preview' | 'code' | 'spec'>('spec');
-  const [buildStep, setBuildStep] = useState<number>(0);
+  const [activeTab, setActiveTab] = useState<'spec' | 'preview' | 'code' | 'deploy' | 'marketing'>('spec');
+
+  // Aşama 4 & 5: Pazarlama ve Karar Motoru
+  const [marketingData, setMarketingData] = useState<MarketingDecision | null>(null);
+  const [marketingLoading, setMarketingLoading] = useState(false);
 
   const generateIdeas = async () => {
     setLoading(true);
@@ -66,6 +88,7 @@ export default function App() {
     setSelectedIdea(null);
     setSpec(null);
     setBuiltCode(null);
+    setMarketingData(null);
     
     try {
       const body = customIdea.trim() ? { customIdea: customIdea.trim() } : undefined;
@@ -99,10 +122,10 @@ export default function App() {
     setSelectedIdea(idea);
     setSpec(null);
     setBuiltCode(null);
+    setMarketingData(null);
     setActiveTab('spec');
     setSpecLoading(true);
     setError(null);
-    setBuildStep(1);
 
     try {
       const res = await fetch('/api/generate-spec', {
@@ -113,7 +136,6 @@ export default function App() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Spec üretilemedi');
       setSpec(data.spec);
-      setBuildStep(2);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -126,7 +148,6 @@ export default function App() {
     if (!selectedIdea || !spec) return;
     setBuildLoading(true);
     setError(null);
-    setBuildStep(3);
 
     try {
       const res = await fetch('/api/build-app', {
@@ -138,7 +159,6 @@ export default function App() {
       if (!res.ok) throw new Error(data.error || 'Uygulama kodu üretilemedi');
       setBuiltCode(data.code);
       setActiveTab('preview');
-      setBuildStep(4);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -146,16 +166,49 @@ export default function App() {
     }
   };
 
-  // Kodun canlı iframe önizlemesi için HTML üretimi
+  // Aşama 4 & 5: Pazarlama ve Karar Testini Çalıştır
+  const handleRunMarketingTest = async () => {
+    if (!selectedIdea || !spec) return;
+    setMarketingLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch('/api/generate-marketing-decision', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idea: selectedIdea, spec })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Pazarlama testi üretilemedi');
+      setMarketingData(data.result);
+      setActiveTab('marketing');
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setMarketingLoading(false);
+    }
+  };
+
+  // Aşama 3: Tek Tıkla Bağımsız HTML/React Dosyası İndirme
+  const downloadStandaloneProject = () => {
+    if (!builtCode || !selectedIdea) return;
+    const htmlContent = getPreviewHtml(builtCode);
+    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${selectedIdea.title.toLowerCase().replace(/[^a-z0-9]/g, '-')}-app.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   // Kodun canlı iframe önizlemesi için HTML üretimi
   const getPreviewHtml = (code: string) => {
-    // import ve export ifadelerini temizle
     let cleanCode = code
       .replace(/import\s+[\s\S]*?from\s+['"].*?['"];?/g, '')
       .replace(/export\s+default\s+function\s*(\w*)/g, 'function App')
       .replace(/export\s+default\s+\w+;?/g, '');
 
-    // Güvenli JSON string olarak koda gömme (özel karakter patlamalarını önlemek için)
     const codeJson = JSON.stringify(cleanCode);
 
     return `
@@ -195,50 +248,55 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-neutral-50 text-neutral-900 font-sans pb-24">
-      <div className="max-w-6xl mx-auto px-6 py-10">
+      <div className="max-w-6xl mx-auto px-6 py-8">
         
-        {/* Üst Bar / Durum Adımları */}
-        <div className="flex items-center justify-between pb-6 mb-8 border-b border-neutral-200">
+        {/* Üst Başlık & 5 Aşamalı Durum Barı */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between pb-6 mb-8 border-b border-neutral-200 gap-4">
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-neutral-900 text-white rounded-xl shadow-sm">
               <Zap className="w-5 h-5" />
             </div>
             <div>
               <h1 className="text-xl font-bold text-neutral-900">Idea-to-App Pipeline</h1>
-              <p className="text-xs text-neutral-500 font-medium">Sıfır Maliyet Otomasyonu (Groq AI & Vercel)</p>
+              <p className="text-xs text-neutral-500 font-medium">Uçtan Uca Sıfır Maliyet Otomasyonu</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 text-xs font-semibold">
-            <span className={`px-3 py-1.5 rounded-full ${!selectedIdea ? 'bg-neutral-900 text-white' : 'bg-green-100 text-green-800'}`}>
-              1. Fikir Motoru {selectedIdea && <Check className="w-3 h-3 inline ml-1" />}
+          {/* 5 Aşama İlerleme Göstergesi */}
+          <div className="flex items-center gap-1.5 overflow-x-auto text-[11px] font-semibold pb-1">
+            <span className={`px-2.5 py-1 rounded-full whitespace-nowrap ${!selectedIdea ? 'bg-neutral-900 text-white' : 'bg-green-100 text-green-800'}`}>
+              1. Fikir {selectedIdea && <Check className="w-3 h-3 inline ml-0.5" />}
             </span>
-            <ArrowRight className="w-3.5 h-3.5 text-neutral-400" />
-            <span className={`px-3 py-1.5 rounded-full ${selectedIdea && !builtCode ? 'bg-neutral-900 text-white' : builtCode ? 'bg-green-100 text-green-800' : 'bg-neutral-200 text-neutral-500'}`}>
-              2. Spec Motoru {builtCode && <Check className="w-3 h-3 inline ml-1" />}
+            <ArrowRight className="w-3 h-3 text-neutral-300 shrink-0" />
+            <span className={`px-2.5 py-1 rounded-full whitespace-nowrap ${selectedIdea && !builtCode ? 'bg-neutral-900 text-white' : builtCode ? 'bg-green-100 text-green-800' : 'bg-neutral-200 text-neutral-500'}`}>
+              2. Spec {builtCode && <Check className="w-3 h-3 inline ml-0.5" />}
             </span>
-            <ArrowRight className="w-3.5 h-3.5 text-neutral-400" />
-            <span className={`px-3 py-1.5 rounded-full ${builtCode ? 'bg-neutral-900 text-white' : 'bg-neutral-200 text-neutral-500'}`}>
-              3. Canlı Uygulama
+            <ArrowRight className="w-3 h-3 text-neutral-300 shrink-0" />
+            <span className={`px-2.5 py-1 rounded-full whitespace-nowrap ${builtCode && !marketingData ? 'bg-neutral-900 text-white' : marketingData ? 'bg-green-100 text-green-800' : 'bg-neutral-200 text-neutral-500'}`}>
+              3. Build & Deploy {builtCode && <Check className="w-3 h-3 inline ml-0.5" />}
+            </span>
+            <ArrowRight className="w-3 h-3 text-neutral-300 shrink-0" />
+            <span className={`px-2.5 py-1 rounded-full whitespace-nowrap ${marketingData ? 'bg-neutral-900 text-white' : 'bg-neutral-200 text-neutral-500'}`}>
+              4. Marketing & 5. Karar
             </span>
           </div>
         </div>
 
         {/* Hata Bildirimi */}
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-xl mb-8 max-w-2xl mx-auto text-center font-medium shadow-sm">
-            <AlertTriangle className="w-5 h-5 inline mr-2 -mt-1" />
+          <div className="bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-xl mb-8 max-w-2xl mx-auto text-center font-medium shadow-sm text-sm">
+            <AlertTriangle className="w-4 h-4 inline mr-2 -mt-1" />
             {error}
           </div>
         )}
 
         {/* ========================================================================= */}
-        {/* AŞAMA 2: SEÇİLEN UYGULAMA İNŞA STÜDYOSU (SPEC & CANLI APP) */}
+        {/* AŞAMA 2, 3, 4, 5: ÇALIŞMA STÜDYOSU */}
         {/* ========================================================================= */}
         {selectedIdea ? (
           <div className="space-y-6">
-            <div className="flex items-center justify-between bg-white border border-neutral-200 p-5 rounded-2xl shadow-sm">
-              <div className="flex items-center gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-white border border-neutral-200 p-5 rounded-2xl shadow-sm gap-4">
+              <div className="flex items-center gap-3">
                 <button 
                   onClick={() => setSelectedIdea(null)}
                   className="p-2 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors"
@@ -248,12 +306,12 @@ export default function App() {
                 </button>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h2 className="text-2xl font-bold text-neutral-900">{selectedIdea.title}</h2>
+                    <h2 className="text-xl font-bold text-neutral-900">{selectedIdea.title}</h2>
                     <span className="text-xs px-2.5 py-0.5 bg-neutral-100 text-neutral-700 rounded-full font-bold border border-neutral-200">
                       {selectedIdea.totalScore}/40 Puan
                     </span>
                   </div>
-                  <p className="text-sm text-neutral-500 mt-0.5">{selectedIdea.problem}</p>
+                  <p className="text-xs text-neutral-500 mt-0.5 max-w-xl">{selectedIdea.problem}</p>
                 </div>
               </div>
 
@@ -262,95 +320,110 @@ export default function App() {
                   <button
                     onClick={handleBuildApp}
                     disabled={buildLoading}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-neutral-900 text-white rounded-xl font-medium hover:bg-neutral-800 transition-colors shadow-sm disabled:opacity-50 text-sm"
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-neutral-900 text-white rounded-xl font-medium hover:bg-neutral-800 transition-colors shadow-sm disabled:opacity-50 text-xs"
                   >
-                    {buildLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Hammer className="w-4 h-4" />}
-                    {buildLoading ? 'Uygulama İnşa Ediliyor...' : 'Uygulamayı İnşa Et (Build)'}
+                    {buildLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Hammer className="w-3.5 h-3.5" />}
+                    {buildLoading ? 'İnşa Ediliyor...' : 'Uygulamayı İnşa Et (Build)'}
                   </button>
                 )}
                 {builtCode && (
                   <button
-                    onClick={handleBuildApp}
-                    disabled={buildLoading}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-neutral-100 text-neutral-800 rounded-xl font-medium hover:bg-neutral-200 transition-colors text-xs"
+                    onClick={handleRunMarketingTest}
+                    disabled={marketingLoading}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-colors text-xs shadow-sm disabled:opacity-50"
                   >
-                    <Sparkles className="w-3.5 h-3.5" /> Tekrar Derle
+                    {marketingLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <TrendingUp className="w-3.5 h-3.5" />}
+                    {marketingLoading ? 'Analiz Ediliyor...' : 'Aşama 4 & 5: Reklam & CAC Kararını Çalıştır'}
                   </button>
                 )}
               </div>
             </div>
 
-            {/* Spec Yükleniyor Durumu */}
+            {/* Spec Yükleniyor */}
             {specLoading && (
               <div className="bg-white border border-neutral-200 rounded-2xl p-12 text-center shadow-sm">
                 <Loader2 className="w-8 h-8 animate-spin mx-auto text-neutral-900 mb-3" />
                 <h3 className="text-lg font-bold text-neutral-900">Aşama 2: SPEC.md Çıkarılıyor...</h3>
-                <p className="text-sm text-neutral-500 max-w-md mx-auto mt-1">
-                  "Önce spec, sonra kod" disiplinine uygun olarak veri modeli, kullanıcı akışları ve kapsam dışı maddeler hazırlanıyor.
+                <p className="text-xs text-neutral-500 max-w-md mx-auto mt-1">
+                  "Önce spec, sonra kod" disiplinine uygun olarak veri modeli, akışlar ve kapsam sınırları hazırlanıyor.
                 </p>
               </div>
             )}
 
-            {/* Spec ve Önizleme Sekmeleri */}
+            {/* Çalışma Stüdyosu Sekmeleri */}
             {spec && (
               <div className="bg-white border border-neutral-200 rounded-2xl overflow-hidden shadow-sm">
-                <div className="flex items-center justify-between border-b border-neutral-200 px-6 py-3 bg-neutral-50/50">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between border-b border-neutral-200 px-6 py-2.5 bg-neutral-50/50 overflow-x-auto">
+                  <div className="flex items-center gap-1.5">
                     <button
                       onClick={() => setActiveTab('spec')}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                         activeTab === 'spec' ? 'bg-white text-neutral-900 shadow-sm border border-neutral-200' : 'text-neutral-500 hover:text-neutral-900'
                       }`}
                     >
-                      <Layers className="w-4 h-4" /> 1. Şartname (SPEC.md)
+                      <Layers className="w-3.5 h-3.5" /> 1. Şartname (SPEC.md)
                     </button>
                     {builtCode && (
                       <button
                         onClick={() => setActiveTab('preview')}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                           activeTab === 'preview' ? 'bg-white text-neutral-900 shadow-sm border border-neutral-200' : 'text-neutral-500 hover:text-neutral-900'
                         }`}
                       >
-                        <Eye className="w-4 h-4 text-green-600" /> 2. Canlı Çalışan Uygulama
+                        <Eye className="w-3.5 h-3.5 text-green-600" /> 2. Canlı Uygulama
+                      </button>
+                    )}
+                    {builtCode && (
+                      <button
+                        onClick={() => setActiveTab('deploy')}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                          activeTab === 'deploy' ? 'bg-white text-neutral-900 shadow-sm border border-neutral-200' : 'text-neutral-500 hover:text-neutral-900'
+                        }`}
+                      >
+                        <ExternalLink className="w-3.5 h-3.5 text-blue-600" /> 3. Deploy & Dışa Aktar
                       </button>
                     )}
                     {builtCode && (
                       <button
                         onClick={() => setActiveTab('code')}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                           activeTab === 'code' ? 'bg-white text-neutral-900 shadow-sm border border-neutral-200' : 'text-neutral-500 hover:text-neutral-900'
                         }`}
                       >
-                        <Code className="w-4 h-4" /> 3. Kaynak Kod
+                        <Code className="w-3.5 h-3.5" /> 4. Kaynak Kod
+                      </button>
+                    )}
+                    {marketingData && (
+                      <button
+                        onClick={() => setActiveTab('marketing')}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                          activeTab === 'marketing' ? 'bg-white text-indigo-700 shadow-sm border border-neutral-200' : 'text-neutral-500 hover:text-neutral-900'
+                        }`}
+                      >
+                        <BarChart3 className="w-3.5 h-3.5 text-indigo-600" /> 5. Marketing & Karar (CAC)
                       </button>
                     )}
                   </div>
-
-                  {activeTab === 'preview' && (
-                    <span className="text-xs px-3 py-1 bg-green-50 text-green-700 border border-green-200 rounded-full font-bold flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> Canlı İn-Memory MVP
-                    </span>
-                  )}
                 </div>
 
                 <div className="p-6">
                   {/* TAB 1: SPEC */}
                   {activeTab === 'spec' && (
                     <div className="space-y-6">
-                      <div className="border-b border-neutral-100 pb-4">
-                        <span className="text-xs uppercase font-bold text-neutral-400 tracking-wider">Slogan & Vizyon</span>
-                        <h3 className="text-xl font-bold text-neutral-900 mt-1">{spec.tagline}</h3>
+                      <div className="border-b border-neutral-100 pb-3">
+                        <span className="text-[11px] uppercase font-bold text-neutral-400 tracking-wider">Slogan & Vizyon</span>
+                        <h3 className="text-lg font-bold text-neutral-900 mt-0.5">{spec.tagline}</h3>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="bg-neutral-50 p-4 rounded-xl border border-neutral-200/60">
-                          <h4 className="text-sm font-bold text-neutral-900 mb-3 flex items-center gap-2">
-                            <CheckCircle2 className="w-4 h-4 text-neutral-700" /> Kullanıcı Akışları (Adım Adım)
+                          <h4 className="text-xs font-bold text-neutral-900 mb-2 flex items-center gap-2">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-neutral-700" /> Kullanıcı Akışları (Adım Adım)
                           </h4>
-                          <ul className="space-y-2 text-sm text-neutral-700">
+                          <ul className="space-y-1.5 text-xs text-neutral-700">
                             {spec.userFlows.map((flow, idx) => (
                               <li key={idx} className="flex items-start gap-2">
-                                <span className="font-semibold text-neutral-400 text-xs mt-0.5">•</span>
+                                <span className="font-semibold text-neutral-400 text-[11px]">•</span>
                                 <span>{flow}</span>
                               </li>
                             ))}
@@ -358,12 +431,12 @@ export default function App() {
                         </div>
 
                         <div className="bg-neutral-50 p-4 rounded-xl border border-neutral-200/60">
-                          <h4 className="text-sm font-bold text-neutral-900 mb-3 flex items-center gap-2">
-                            <Code className="w-4 h-4 text-neutral-700" /> Veri Modeli (Supabase / In-Memory)
+                          <h4 className="text-xs font-bold text-neutral-900 mb-2 flex items-center gap-2">
+                            <Code className="w-3.5 h-3.5 text-neutral-700" /> Veri Modeli (Supabase / In-Memory)
                           </h4>
-                          <div className="space-y-2">
+                          <div className="space-y-1.5">
                             {spec.dataModel.map((model, idx) => (
-                              <div key={idx} className="bg-white p-2.5 rounded-lg border border-neutral-200 text-xs">
+                              <div key={idx} className="bg-white p-2 rounded-lg border border-neutral-200 text-[11px]">
                                 <span className="font-mono font-bold text-neutral-900">tablo: {model.table}</span>
                                 <p className="text-neutral-500 mt-0.5">{model.description}</p>
                               </div>
@@ -372,10 +445,10 @@ export default function App() {
                         </div>
 
                         <div className="bg-neutral-50 p-4 rounded-xl border border-neutral-200/60">
-                          <h4 className="text-sm font-bold text-neutral-900 mb-3 flex items-center gap-2">
-                            <Layers className="w-4 h-4 text-neutral-700" /> Sayfa ve Ekran Listesi
+                          <h4 className="text-xs font-bold text-neutral-900 mb-2 flex items-center gap-2">
+                            <Layers className="w-3.5 h-3.5 text-neutral-700" /> Sayfa ve Ekran Listesi
                           </h4>
-                          <ul className="space-y-1.5 text-sm text-neutral-700">
+                          <ul className="space-y-1 text-xs text-neutral-700">
                             {spec.screens.map((screen, idx) => (
                               <li key={idx} className="flex items-center gap-2">
                                 <span className="w-1.5 h-1.5 rounded-full bg-neutral-400"></span>
@@ -386,13 +459,13 @@ export default function App() {
                         </div>
 
                         <div className="bg-neutral-50 p-4 rounded-xl border border-neutral-200/60">
-                          <h4 className="text-sm font-bold text-neutral-900 mb-3 flex items-center gap-2 text-red-700">
-                            <AlertTriangle className="w-4 h-4 text-red-600" /> Kapsam Dışı Bırakılanlar (v1 Sınırı)
+                          <h4 className="text-xs font-bold text-neutral-900 mb-2 flex items-center gap-2 text-red-700">
+                            <AlertTriangle className="w-3.5 h-3.5 text-red-600" /> Kapsam Dışı Bırakılanlar (v1 Sınırı)
                           </h4>
-                          <ul className="space-y-1.5 text-sm text-neutral-600">
+                          <ul className="space-y-1 text-xs text-neutral-600">
                             {spec.outOfScope.map((item, idx) => (
                               <li key={idx} className="flex items-start gap-2">
-                                <span className="text-red-400 font-bold text-xs mt-0.5">✕</span>
+                                <span className="text-red-400 font-bold text-[10px]">✕</span>
                                 <span>{item}</span>
                               </li>
                             ))}
@@ -401,21 +474,21 @@ export default function App() {
                       </div>
 
                       {!builtCode && (
-                        <div className="pt-4 flex justify-end">
+                        <div className="pt-2 flex justify-end">
                           <button
                             onClick={handleBuildApp}
                             disabled={buildLoading}
-                            className="inline-flex items-center gap-2 px-6 py-3 bg-neutral-900 text-white rounded-xl font-medium hover:bg-neutral-800 transition-colors shadow-sm disabled:opacity-50 text-sm"
+                            className="inline-flex items-center gap-2 px-6 py-2.5 bg-neutral-900 text-white rounded-xl font-medium hover:bg-neutral-800 transition-colors shadow-sm disabled:opacity-50 text-xs"
                           >
-                            {buildLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-                            {buildLoading ? 'Uygulama İnşa Ediliyor (10-15 sn)...' : 'Bu Spec ile Uygulamayı Canlı İnşa Et'}
+                            {buildLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+                            {buildLoading ? 'Uygulama İnşa Ediliyor...' : 'Bu Spec ile Uygulamayı Canlı İnşa Et'}
                           </button>
                         </div>
                       )}
                     </div>
                   )}
 
-                  {/* TAB 2: CANLI ÖNİZLEME (IFRAME SANDBOX) */}
+                  {/* TAB 2: CANLI ÖNİZLEME */}
                   {activeTab === 'preview' && builtCode && (
                     <div className="space-y-3">
                       <div className="border border-neutral-200 rounded-xl overflow-hidden bg-white shadow-inner h-[650px]">
@@ -426,18 +499,168 @@ export default function App() {
                           sandbox="allow-scripts allow-modals allow-forms"
                         />
                       </div>
-                      <p className="text-xs text-neutral-400 text-center">
-                        Bu uygulama az önce oluşturulan şartnameye (`SPEC.md`) uygun olarak sıfırdan derlenmiş çalışan canlı bir MVP'dir.
-                      </p>
                     </div>
                   )}
 
-                  {/* TAB 3: KAYNAK KOD */}
+                  {/* TAB 3: AŞAMA 3 - DEPLOY & DIŞA AKTAR */}
+                  {activeTab === 'deploy' && builtCode && (
+                    <div className="max-w-2xl mx-auto space-y-6 py-4">
+                      <div className="text-center space-y-2">
+                        <div className="w-12 h-12 bg-green-50 text-green-700 rounded-2xl flex items-center justify-center mx-auto border border-green-200">
+                          <ExternalLink className="w-6 h-6" />
+                        </div>
+                        <h3 className="text-lg font-bold text-neutral-900">Aşama 3: Deploy & Dışa Aktarma</h3>
+                        <p className="text-xs text-neutral-500">
+                          Üretilen bu çalışan mikro-SaaS uygulamasını ister tek bir bağımsız dosya olarak indirin, ister Vercel / Netlify'a yükleyin.
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                        <div className="bg-neutral-50 border border-neutral-200 p-5 rounded-xl flex flex-col justify-between space-y-4">
+                          <div>
+                            <h4 className="font-bold text-sm text-neutral-900 mb-1 flex items-center gap-2">
+                              <Download className="w-4 h-4 text-neutral-700" /> Tek Tıkla İndir
+                            </h4>
+                            <p className="text-xs text-neutral-500 leading-relaxed">
+                              Tüm React, Tailwind CSS ve çalışma mantığını barındıran tek parça bağımsız `.html` dosyasını bilgisayarınıza indirin. Her yerde anında açılır.
+                            </p>
+                          </div>
+                          <button
+                            onClick={downloadStandaloneProject}
+                            className="w-full py-2.5 bg-neutral-900 text-white rounded-lg text-xs font-semibold hover:bg-neutral-800 transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+                          >
+                            <Download className="w-3.5 h-3.5" /> Uygulama Paketini İndir
+                          </button>
+                        </div>
+
+                        <div className="bg-neutral-50 border border-neutral-200 p-5 rounded-xl flex flex-col justify-between space-y-4">
+                          <div>
+                            <h4 className="font-bold text-sm text-neutral-900 mb-1 flex items-center gap-2">
+                              <Zap className="w-4 h-4 text-neutral-700" /> Canlı Vercel Deploy Checklist
+                            </h4>
+                            <ul className="text-xs text-neutral-600 space-y-1 mt-2">
+                              <li className="flex items-center gap-1.5">
+                                <Check className="w-3 h-3 text-green-600" /> Sıfır maliyet (Free Tier)
+                              </li>
+                              <li className="flex items-center gap-1.5">
+                                <Check className="w-3 h-3 text-green-600" /> Otomatik SSL & Subdomain
+                              </li>
+                              <li className="flex items-center gap-1.5">
+                                <Check className="w-3 h-3 text-green-600" /> Supabase bağlantı hazır
+                              </li>
+                            </ul>
+                          </div>
+                          <button
+                            onClick={() => window.open('https://vercel.com/new', '_blank')}
+                            className="w-full py-2.5 bg-white border border-neutral-200 text-neutral-900 rounded-lg text-xs font-semibold hover:bg-neutral-100 transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+                          >
+                            Vercel'de Yeni Proje Aç <ExternalLink className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB 4: KAYNAK KOD */}
                   {activeTab === 'code' && builtCode && (
                     <div className="relative">
                       <pre className="bg-neutral-900 text-neutral-100 p-5 rounded-xl text-xs font-mono overflow-x-auto max-h-[600px]">
                         <code>{builtCode}</code>
                       </pre>
+                    </div>
+                  )}
+
+                  {/* TAB 5: AŞAMA 4 & 5 - MARKETING & KARAR MOTORU (CAC) */}
+                  {activeTab === 'marketing' && marketingData && (
+                    <div className="space-y-6 py-2">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* AŞAMA 4: REKLAM KAMPANYASI */}
+                        <div className="bg-neutral-50 border border-neutral-200 p-5 rounded-2xl space-y-4">
+                          <div className="flex items-center justify-between border-b border-neutral-200 pb-3">
+                            <h4 className="font-bold text-sm text-neutral-900 flex items-center gap-2">
+                              <Users className="w-4 h-4 text-indigo-600" /> Aşama 4: Reklam Stratejisi
+                            </h4>
+                            <span className="text-xs px-2.5 py-0.5 bg-indigo-50 text-indigo-700 rounded-full font-bold border border-indigo-200">
+                              {marketingData.channel}
+                            </span>
+                          </div>
+
+                          <div className="space-y-3 text-xs">
+                            <div className="bg-white p-3.5 rounded-xl border border-neutral-200">
+                              <span className="text-[10px] uppercase font-bold text-neutral-400">Reklam Başlığı</span>
+                              <p className="font-semibold text-neutral-900 mt-0.5">{marketingData.adCopy.headline}</p>
+                              
+                              <span className="text-[10px] uppercase font-bold text-neutral-400 block mt-2">Reklam Metni</span>
+                              <p className="text-neutral-600 mt-0.5">{marketingData.adCopy.body}</p>
+
+                              <span className="text-[10px] uppercase font-bold text-neutral-400 block mt-2">Harekete Geçirici Mesaj (CTA)</span>
+                              <span className="inline-block mt-1 px-3 py-1 bg-neutral-900 text-white rounded text-[11px] font-bold">
+                                {marketingData.adCopy.callToAction}
+                              </span>
+                            </div>
+
+                            <div>
+                              <span className="text-[10px] uppercase font-bold text-neutral-400 block mb-1.5">Kurulum Checklist'i</span>
+                              <ul className="space-y-1.5 text-neutral-700">
+                                {marketingData.setupChecklist.map((item, idx) => (
+                                  <li key={idx} className="flex items-start gap-2 bg-white p-2 rounded-lg border border-neutral-100">
+                                    <Check className="w-3.5 h-3.5 text-green-600 shrink-0 mt-0.5" />
+                                    <span>{item}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* AŞAMA 5: KARAR MOTORU & CAC EŞİK KONTROLÜ */}
+                        <div className="bg-neutral-50 border border-neutral-200 p-5 rounded-2xl space-y-4">
+                          <div className="flex items-center justify-between border-b border-neutral-200 pb-3">
+                            <h4 className="font-bold text-sm text-neutral-900 flex items-center gap-2">
+                              <BarChart3 className="w-4 h-4 text-green-600" /> Aşama 5: Karar Motoru (CAC)
+                            </h4>
+                            <span className={`text-xs px-3 py-1 rounded-full font-bold border ${
+                              marketingData.simulation.decision === 'DEVAM ET' 
+                                ? 'bg-green-50 text-green-700 border-green-200' 
+                                : 'bg-red-50 text-red-700 border-red-200'
+                            }`}>
+                              {marketingData.simulation.decision}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3 text-center">
+                            <div className="bg-white p-3 rounded-xl border border-neutral-200">
+                              <span className="text-[10px] text-neutral-500 font-medium">Test Bütçesi</span>
+                              <div className="text-base font-bold text-neutral-900">${marketingData.simulation.testBudget}</div>
+                            </div>
+                            <div className="bg-white p-3 rounded-xl border border-neutral-200">
+                              <span className="text-[10px] text-neutral-500 font-medium">Ziyaretçi</span>
+                              <div className="text-base font-bold text-neutral-900">{marketingData.simulation.visitors}</div>
+                            </div>
+                            <div className="bg-white p-3 rounded-xl border border-neutral-200">
+                              <span className="text-[10px] text-neutral-500 font-medium">Dönüşüm / Kayıt</span>
+                              <div className="text-base font-bold text-neutral-900">{marketingData.simulation.conversions}</div>
+                            </div>
+                            <div className="bg-white p-3 rounded-xl border border-neutral-200">
+                              <span className="text-[10px] text-neutral-500 font-medium">Hesaplanan CAC</span>
+                              <div className={`text-base font-bold ${marketingData.simulation.cac <= 1 ? 'text-green-600' : 'text-red-600'}`}>
+                                ${marketingData.simulation.cac}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className={`p-4 rounded-xl border text-xs leading-relaxed ${
+                            marketingData.simulation.decision === 'DEVAM ET' 
+                              ? 'bg-green-50 border-green-200 text-green-900' 
+                              : 'bg-red-50 border-red-200 text-red-900'
+                          }`}>
+                            <span className="font-bold block mb-1">
+                              {marketingData.simulation.decision === 'DEVAM ET' ? '🚀 Otomatik Karar: BÜTÇEYİ ARTIR' : '🛑 Otomatik Karar: DURDUR'}
+                            </span>
+                            {marketingData.simulation.decisionNote}
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -506,45 +729,6 @@ export default function App() {
                 <ul className="list-disc pl-5 space-y-1 text-xs">
                   {warnings.map((w, i) => <li key={i}>{w}</li>)}
                 </ul>
-              </div>
-            )}
-
-            {rawSignals && ideas.length > 0 && (
-              <div className="mb-8 max-w-4xl mx-auto">
-                <button 
-                  onClick={() => setShowRaw(!showRaw)}
-                  className="flex items-center gap-2 text-xs font-semibold text-neutral-600 hover:text-neutral-900 transition-colors mx-auto bg-white border border-neutral-200 px-3.5 py-1.5 rounded-full shadow-sm"
-                >
-                  <FileText className="w-3.5 h-3.5" />
-                  {showRaw ? 'Ham Sinyalleri Gizle' : 'Kullanılan Ham Sinyalleri Gör'}
-                </button>
-                
-                {showRaw && (
-                  <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-left">
-                    <div className="bg-white border border-neutral-200 rounded-xl p-3.5 shadow-sm h-52 overflow-y-auto">
-                      <h4 className="font-bold text-[11px] uppercase tracking-wider text-neutral-400 mb-2 sticky top-0 bg-white pb-1 border-b border-neutral-100">
-                        Reddit Sinyalleri ({rawSignals.reddit.length})
-                      </h4>
-                      <ul className="space-y-2 text-xs text-neutral-700">
-                        {rawSignals.reddit.map((r, i) => (
-                          <li key={i} className="pb-2 border-b border-neutral-50 last:border-0">{r}</li>
-                        ))}
-                      </ul>
-                    </div>
-                    <div className="bg-white border border-neutral-200 rounded-xl p-3.5 shadow-sm h-52 overflow-y-auto">
-                      <h4 className="font-bold text-[11px] uppercase tracking-wider text-neutral-400 mb-2 sticky top-0 bg-white pb-1 border-b border-neutral-100">
-                        Pazar Trendleri ({rawSignals.trends.length})
-                      </h4>
-                      <div className="flex flex-wrap gap-1.5">
-                        {rawSignals.trends.map((t, i) => (
-                          <span key={i} className="bg-neutral-100 text-neutral-700 px-2.5 py-0.5 rounded text-xs border border-neutral-200">
-                            {t}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
