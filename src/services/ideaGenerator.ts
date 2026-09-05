@@ -214,10 +214,10 @@ Her fikri su kriterlere gore 10 uzerinden puanla:
 3. Teknik fizibilite - 1 gunde cikmali (feasibility)
 4. Monetizasyon sinyali (monetization)
 
-Yanitini KESINLIKLE asagidaki JSON formatinda ver, disinda hicbir metin veya markdown kullanma:
+Yanitini KESINLIKLE TAM 3 ELEMANLI asagidaki JSON formatinda dizi olarak ver, disinda hicbir metin veya markdown kullanma:
 [
   {
-    "title": "FeedbackPulse (Gercek Urun Adi)",
+    "title": "Gercek Marka Adi 1",
     "problem": "1-2 cumle ile problem tanimi",
     "targetUser": "Hedef kullanici",
     "alternatives": "Mevcut alternatifler ve neden yetersizler",
@@ -226,6 +226,28 @@ Yanitini KESINLIKLE asagidaki JSON formatinda ver, disinda hicbir metin veya mar
     "feasibilityNote": "Fizibilite notu",
     "scores": { "pain": 8, "lackOfSolutions": 7, "feasibility": 9, "monetization": 7 },
     "totalScore": 31
+  },
+  {
+    "title": "Gercek Marka Adi 2",
+    "problem": "1-2 cumle ile problem tanimi",
+    "targetUser": "Hedef kullanici",
+    "alternatives": "Mevcut alternatifler ve neden yetersizler",
+    "whyNow": "Neden simdi yapilmali",
+    "mvpScope": ["Ozellik 1", "Ozellik 2", "Ozellik 3"],
+    "feasibilityNote": "Fizibilite notu",
+    "scores": { "pain": 8, "lackOfSolutions": 8, "feasibility": 8, "monetization": 8 },
+    "totalScore": 32
+  },
+  {
+    "title": "Gercek Marka Adi 3",
+    "problem": "1-2 cumle ile problem tanimi",
+    "targetUser": "Hedef kullanici",
+    "alternatives": "Mevcut alternatifler ve neden yetersizler",
+    "whyNow": "Neden simdi yapilmali",
+    "mvpScope": ["Ozellik 1", "Ozellik 2", "Ozellik 3"],
+    "feasibilityNote": "Fizibilite notu",
+    "scores": { "pain": 7, "lackOfSolutions": 7, "feasibility": 9, "monetization": 7 },
+    "totalScore": 30
   }
 ]`;
     }
