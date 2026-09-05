@@ -1,5 +1,6 @@
 import express from "express";
 import { generateIdeasHandler } from "./services/ideaGenerator.js";
+import { generateSpecHandler, buildAppHandler } from "./services/specBuilder.js";
 
 const app = express();
 app.use(express.json());
@@ -14,5 +15,7 @@ app.get("/api/test", (req, res) => {
 });
 
 app.post("/api/generate-ideas", generateIdeasHandler);
+app.post("/api/generate-spec", generateSpecHandler);
+app.post("/api/build-app", buildAppHandler);
 
 export default app;

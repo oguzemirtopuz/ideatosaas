@@ -1,0 +1,192 @@
+import { Request, Response } from "express";
+import Groq from "groq-sdk";
+
+// Aşama 2: Spec Üretici Handler
+export async function generateSpecHandler(req: Request, res: Response) {
+  try {
+    const apiKey = process.env.GROQ_API_KEY;
+    if (!apiKey) {
+      res.status(500).json({ error: "GROQ_API_KEY bulunamadı." });
+      return;
+    }
+
+    const { idea } = req.body;
+    if (!idea || !idea.title) {
+      res.status(400).json({ error: "Geçerli bir fikir nesnesi gerekli." });
+      return;
+    }
+
+    const groq = new Groq({ apiKey });
+
+    // Aktif modelleri al
+    let activeModels: string[] = [];
+    try {
+      const modelList = await groq.models.list();
+      activeModels = modelList.data
+        .filter((m: any) => m.active && !m.id.includes("whisper") && !m.id.includes("guard"))
+        .map((m: any) => m.id);
+    } catch (e: any) {
+      activeModels = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "gemma2-9b-it"];
+    }
+
+    const prompt = `Sen kıdemli bir full-stack mimar ve ürün yöneticisisin. 
+Aşağıda seçilen mikro-SaaS fikri için "Aşama 2: SPEC-FIRST" disiplinine uygun eksiksiz bir teknik şartname (SPEC) hazırla.
+Stack kuralı: Next.js/React, Tailwind CSS, Supabase (Postgres & Auth), Vercel free tier, sıfır maliyet.
+
+Seçilen Fikir:
+Başlık: ${idea.title}
+Problem: ${idea.problem}
+Hedef Kitle: ${idea.targetUser}
+MVP Kapsamı: ${JSON.stringify(idea.mvpScope)}
+
+Aşağıdaki JSON formatında yanıt ver (Markdown veya ek metin kullanma):
+{
+  "title": "${idea.title}",
+  "tagline": "Etkileyici ve kısa bir ürün sloganı",
+  "userFlows": [
+    "1. Adım: Kullanıcı kayıt/giriş yapar ve karşılama ekranını görür",
+    "2. Adım: İlk verisini (örneğin kayıt/takip verisi) girer",
+    "3. Adım: Dashboard üzerinden grafik ve durum özetini inceler",
+    "4. Adım: Rapor alır veya veri günceller"
+  ],
+  "dataModel": [
+    { "table": "users", "description": "Kullanıcı profilleri ve kimlik bilgileri" },
+    { "table": "records", "description": "Uygulamanın ana veri kayıtları ve zaman damgası" }
+  ],
+  "screens": [
+    "1. Giriş ve Karşılama Paneli",
+    "2. Veri Ekleme / İşlem Formu",
+    "3. Ana Dashboard & İstatistik/Grafik Ekranı"
+  ],
+  "outOfScope": [
+    "Karmaşık takım izinleri ve çoklu şirket yönetimi (v2'ye bırakıldı)",
+    "Özel mobil native bildirimler (PWA ile çözülecek)",
+    "Ücretli üçüncü parti kurumsal API entegrasyonları"
+  ],
+  "buildChecklist": [
+    "Adım 1: Temel Arayüz İskeleti ve Navigasyon",
+    "Adım 2: Form ve Canlı Veri Giriş Mekanizması",
+    "Adım 3: İstatistikler ve Görselleştirme/Grafik",
+    "Adım 4: Veri Dışa Aktarma ve Doğrulama"
+  ]
+}`;
+
+    let response = null;
+    for (const modelName of activeModels) {
+      try {
+        response = await groq.chat.completions.create({
+          model: modelName,
+          messages: [
+            { role: "system", content: "Sen bir JSON API'sisin. Sadece geçerli JSON nesnesi döndür." },
+            { role: "user", content: prompt }
+          ],
+          temperature: 0.5,
+          max_tokens: 3500
+        });
+        if (response?.choices?.[0]?.message?.content) {
+          const content = response.choices[0].message.content.trim();
+          const firstBrace = content.indexOf('{');
+          const lastBrace = content.lastIndexOf('}');
+          if (firstBrace !== -1 && lastBrace !== -1) {
+            JSON.parse(content.substring(firstBrace, lastBrace + 1));
+            break;
+          }
+        }
+      } catch (err) {
+        // sonraki modeli dene
+      }
+    }
+
+    if (!response || !response.choices?.[0]?.message?.content) {
+      throw new Error("Spec oluşturulamadı.");
+    }
+
+    const content = response.choices[0].message.content.trim();
+    const firstBrace = content.indexOf('{');
+    const lastBrace = content.lastIndexOf('}');
+    const spec = JSON.parse(content.substring(firstBrace, lastBrace + 1));
+
+    res.json({ spec });
+  } catch (error: any) {
+    console.error("Spec generation error:", error);
+    res.status(500).json({ error: error.message || "Spec oluşturulamadı" });
+  }
+}
+
+// Aşama 2: Canlı Çalışan Uygulama Kodu Üretici Handler
+export async function buildAppHandler(req: Request, res: Response) {
+  try {
+    const apiKey = process.env.GROQ_API_KEY;
+    if (!apiKey) {
+      res.status(500).json({ error: "GROQ_API_KEY bulunamadı." });
+      return;
+    }
+
+    const { idea, spec } = req.body;
+    if (!idea || !spec) {
+      res.status(400).json({ error: "Fikir ve Spec verisi gerekli." });
+      return;
+    }
+
+    const groq = new Groq({ apiKey });
+
+    let activeModels: string[] = [];
+    try {
+      const modelList = await groq.models.list();
+      activeModels = modelList.data
+        .filter((m: any) => m.active && !m.id.includes("whisper") && !m.id.includes("guard"))
+        .map((m: any) => m.id);
+    } catch (e) {
+      activeModels = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "gemma2-9b-it"];
+    }
+
+    const prompt = `Sen dahi bir frontend yazılımcısısın. 
+Görevin: Aşağıda özellikleri ve şartnamesi verilen "${idea.title}" mikro-SaaS uygulaması için TEK DOSYALIK, TAMAMEN ÇALIŞAN, EKSİKSİZ, GÖZ ALICI bir React bileşeni kodu yazmak.
+
+Uygulama Bilgileri:
+Başlık: ${idea.title}
+Problem: ${idea.problem}
+Akışlar: ${JSON.stringify(spec.userFlows)}
+Ekranlar: ${JSON.stringify(spec.screens)}
+
+KESİN KURALLAR:
+1. Kod React 19 + Tailwind CSS uyumlu olmalıdır.
+2. Lucide ikonları veya standart SVG / emoji kullanılabilir. Harici kütüphane import etme!
+3. 'export default function App()' şeklinde tek bir ana bileşen döndür.
+4. Tamamen işlevsel olsun: Kullanıcı form doldurabilmeli, veri ekleyebilmeli, kayıtları listeleyebilmeli, filtreleyebilmeli ve canlı grafik/özet barları görebilmeli (React useState kullanarak in-memory çalışan gerçek bir mini-SaaS).
+5. Placeholder ('// kod buraya gelecek' gibi) ASLA bırakma! Eksiksiz, bitmiş kod olsun.
+6. Yanıt olarak YALNIZCA JavaScript/JSX kodunu ver. Kod blokları (\`\`\`jsx vb.) kullanma veya temizlenebilir şekilde ver.`;
+
+    let response = null;
+    for (const modelName of activeModels) {
+      try {
+        response = await groq.chat.completions.create({
+          model: modelName,
+          messages: [
+            { role: "system", content: "Sen sadece çalışan temiz React bileşeni kodu üreten bir kod asistanısın. Açıklama metni ekleme." },
+            { role: "user", content: prompt }
+          ],
+          temperature: 0.4,
+          max_tokens: 4000
+        });
+        if (response?.choices?.[0]?.message?.content) {
+          break;
+        }
+      } catch (err) {
+        // sonraki modeli dene
+      }
+    }
+
+    if (!response || !response.choices?.[0]?.message?.content) {
+      throw new Error("Uygulama kodu üretilemedi.");
+    }
+
+    let code = response.choices[0].message.content.trim();
+    code = code.replace(/```(?:jsx|tsx|javascript|typescript)?\s*/gi, "").replace(/```\s*$/g, "").trim();
+
+    res.json({ code });
+  } catch (error: any) {
+    console.error("App build error:", error);
+    res.status(500).json({ error: error.message || "Uygulama inşası başarısız oldu" });
+  }
+}
