@@ -524,7 +524,9 @@ export default function App() {
   // Canlı Iframe Önizleme Kodu
   const getPreviewHtml = (code: string) => {
     const cleanCode = sanitizeReactCode(code);
-    const codeJson = JSON.stringify(cleanCode);
+    const safeCodeJson = JSON.stringify(cleanCode)
+      .replace(/</g, '\\u003c')
+      .replace(/>/g, '\\u003e');
 
     return `
       <!DOCTYPE html>
@@ -533,9 +535,9 @@ export default function App() {
           <meta charset="utf-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1" />
           <script src="https://cdn.tailwindcss.com"></script>
-          <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
-          <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
-          <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+          <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" onerror="this.src='https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js'"></script>
+          <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" onerror="this.src='https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js'"></script>
+          <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.9/babel.min.js" onerror="this.src='https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.9/babel.min.js'"></script>
           <style>
             body { font-family: system-ui, -apple-system, sans-serif; margin: 0; min-height: 100vh; }
             #loading-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 350px; color: #737373; font-size: 13px; gap: 12px; }
@@ -626,10 +628,14 @@ export default function App() {
             function checkAndRun() {
               attempts++;
               if (!window.Babel || !window.React || !window.ReactDOM) {
-                if (attempts < 60) {
-                  setTimeout(checkAndRun, 50);
+                if (attempts === 15) {
+                  var loaderText = document.querySelector('#loading-state span');
+                  if (loaderText) loaderText.innerText = 'Kütüphaneler indiriliyor (Cloudflare CDN)...';
+                }
+                if (attempts < 120) {
+                  setTimeout(checkAndRun, 100);
                 } else {
-                  showError('Kütüphaneler yüklenemedi (React/Babel CDN zaman aşımı). Lütfen internet bağlantınızı kontrol edip sayfayı yenileyin.');
+                  showError('Kütüphaneler yüklenemedi (React/Babel CDN zaman aşımı). Lütfen internet bağlantınızı kontrol edip önizlemeyi yenileyin.');
                 }
                 return;
               }
@@ -638,7 +644,7 @@ export default function App() {
                 var errBox = document.getElementById('error-box');
                 if (errBox) errBox.style.display = 'none';
 
-                var rawCode = ${codeJson};
+                var rawCode = ${safeCodeJson};
 
                 // React Error Boundary tanımla
                 var ErrorBoundary = (function() {
@@ -679,6 +685,7 @@ export default function App() {
                   "else if (typeof Main !== 'undefined') { _candidate = Main; }\\n" +
                   "else if (typeof SaaSApp !== 'undefined') { _candidate = SaaSApp; }\\n" +
                   "else if (typeof Dashboard !== 'undefined') { _candidate = Dashboard; }\\n" +
+                  "else if (typeof Application !== 'undefined') { _candidate = Application; }\\n" +
                   "window.__CurrentApp = _candidate;",
                   { presets: [['react', { runtime: 'classic' }]] }
                 ).code;
