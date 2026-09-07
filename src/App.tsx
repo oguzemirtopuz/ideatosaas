@@ -5,7 +5,7 @@ import {
   CheckCircle2, AlertTriangle, FileText, ArrowRight, ArrowLeft, 
   Layers, Hammer, Eye, Play, Sparkles, Check, Download, ExternalLink,
   TrendingUp, BarChart3, Users, Archive, Send, MessageSquare, 
-  UserCheck, History, Trash2, FolderGit2
+  UserCheck, History, Trash2, FolderGit2, RefreshCw
 } from 'lucide-react';
 
 interface IdeaScore {
@@ -109,6 +109,7 @@ export default function App() {
   const [specLoading, setSpecLoading] = useState(false);
   const [buildLoading, setBuildLoading] = useState(false);
   const [builtCode, setBuiltCode] = useState<string | null>(null);
+  const [previewKey, setPreviewKey] = useState(0);
   const [activeTab, setActiveTab] = useState<'spec' | 'preview' | 'code' | 'deploy' | 'marketing'>('spec');
 
   // AI Canlı Refine Chat
@@ -551,21 +552,29 @@ export default function App() {
           <div id="error-box" style="display:none; color:#991b1b; background:#fef2f2; border:1px solid #fecaca; padding:16px; border-radius:12px; font-family:monospace; font-size:12px; white-space:pre-wrap; margin-top:12px;"></div>
 
           <script>
-            function showError(msg) {
+            function showError(msg, source) {
               var loader = document.getElementById('loading-state');
               if (loader) loader.style.display = 'none';
               var errBox = document.getElementById('error-box');
               if (errBox) {
                 errBox.style.display = 'block';
-                errBox.innerText = 'Çalışma Hatası: ' + msg;
+                errBox.innerText = 'Çalışma Hatası: ' + msg + (source ? '\nKaynak: ' + source : '');
               }
             }
 
             window.addEventListener('error', function(e) {
-              showError(e.error ? e.error.message : e.message);
+              if (window.__CurrentApp) {
+                console.warn("Harici uyarı (uygulama çalışıyor):", e.message);
+                return;
+              }
+              showError(e.error ? e.error.message : e.message, (e.filename ? e.filename + ':' + e.lineno : 'global'));
             });
 
             window.addEventListener('unhandledrejection', function(e) {
+              if (window.__CurrentApp) {
+                console.warn("Harici asenkron uyarı (uygulama çalışıyor):", e.reason);
+                return;
+              }
               showError(e.reason ? (e.reason.message || String(e.reason)) : 'Bilinmeyen asenkron hata');
             });
 
@@ -626,6 +635,9 @@ export default function App() {
               }
 
               try {
+                var errBox = document.getElementById('error-box');
+                if (errBox) errBox.style.display = 'none';
+
                 var rawCode = ${codeJson};
 
                 // React Error Boundary tanımla
@@ -658,7 +670,7 @@ export default function App() {
 
                 window.__CurrentApp = null;
 
-                // Babel ile JSX'i derle (top-level return kullanmadan)
+                // Babel ile JSX'i derle (classic runtime ile 'import { jsx }' üretilmesini engelle)
                 var transformed = window.Babel.transform(
                   "const { useState, useEffect, useMemo, useRef, useCallback } = React;\\n" +
                   rawCode +
@@ -668,8 +680,13 @@ export default function App() {
                   "else if (typeof SaaSApp !== 'undefined') { _candidate = SaaSApp; }\\n" +
                   "else if (typeof Dashboard !== 'undefined') { _candidate = Dashboard; }\\n" +
                   "window.__CurrentApp = _candidate;",
-                  { presets: ['react'] }
+                  { presets: [['react', { runtime: 'classic' }]] }
                 ).code;
+
+                // Ekstra güvenlik: derlenmiş kodda kalmış tüm import ifadelerini temizle
+                transformed = transformed.replace(/^import\s+[\s\S]*?from\s*['"][^'"]+['"];?/gm, '');
+                transformed = transformed.replace(/^import\s*['"][^'"]+['"];?/gm, '');
+                transformed = transformed.replace(/\bimport\b[^;\n]*;?/gm, '');
 
                 new Function(transformed)();
                 var ResolvedApp = window.__CurrentApp;
@@ -957,13 +974,30 @@ export default function App() {
                   {activeTab === 'preview' && builtCode && (
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                       {/* Sol: Canlı Uygulama Iframe */}
-                      <div className="lg:col-span-2 border border-neutral-200 rounded-xl overflow-hidden bg-white shadow-inner h-[650px]">
-                        <iframe
-                          title="App Sandbox"
-                          srcDoc={getPreviewHtml(builtCode)}
-                          className="w-full h-full border-0"
-                          sandbox="allow-scripts allow-modals allow-forms"
-                        />
+                      <div className="lg:col-span-2 border border-neutral-200 rounded-xl overflow-hidden bg-white shadow-inner h-[650px] flex flex-col">
+                        <div className="px-4 py-2.5 border-b border-neutral-200 bg-neutral-50 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                            <span className="text-xs font-semibold text-neutral-800">Canlı Önizleme (React 18 Sandbox)</span>
+                          </div>
+                          <button
+                            onClick={() => setPreviewKey(k => k + 1)}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium text-neutral-700 bg-white border border-neutral-200 rounded-lg hover:bg-neutral-100 transition-colors shadow-xs cursor-pointer"
+                            title="Önizlemeyi sıfırla ve yeniden yükle"
+                          >
+                            <RefreshCw className="w-3 h-3" />
+                            <span>Yeniden Başlat</span>
+                          </button>
+                        </div>
+                        <div className="flex-1 w-full h-full relative">
+                          <iframe
+                            key={`preview-${previewKey}-${builtCode.length}-${(builtCode.slice(0, 10) + builtCode.slice(-10)).replace(/[^a-zA-Z0-9]/g, '')}`}
+                            title="App Sandbox"
+                            srcDoc={getPreviewHtml(builtCode)}
+                            className="w-full h-full border-0 absolute inset-0"
+                            sandbox="allow-scripts allow-modals allow-forms"
+                          />
+                        </div>
                       </div>
 
                       {/* Sağ: Canlı AI Asistan / Değişiklik İste Chat Paneli */}

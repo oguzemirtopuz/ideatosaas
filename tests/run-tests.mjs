@@ -220,6 +220,38 @@ async function testApiEndpoints() {
     server.close();
   }
 
+  // -------------------------------------------------------------
+  // GRUP 3: BABEL STANDALONE VE CLASSIC RUNTIME GÜVENLİK TESTLERİ
+  // -------------------------------------------------------------
+  console.log('\n--- BÖLÜM 3: Babel Standalone Classic Runtime Testleri ---');
+  await new Promise((resolve) => {
+    runTest('Babel: Classic runtime konfigürasyonu import { jsx } sızıntısını engeller', async () => {
+      // Babel standalone fetch ve klasik runtime testi
+      const res = await fetch('https://unpkg.com/@babel/standalone/babel.min.js');
+      const babelJs = await res.text();
+      const vm = await import('vm');
+      const sandbox = { console };
+      sandbox.window = sandbox;
+      sandbox.global = sandbox;
+      vm.createContext(sandbox);
+      vm.runInContext(babelJs, sandbox);
+
+      const testJsx = 'function App() { return <div className="bg-red-500"><span>Test</span></div>; }';
+      const transformed = sandbox.Babel.transform(testJsx, {
+        presets: [['react', { runtime: 'classic' }]]
+      }).code;
+
+      assert.strictEqual(/\bimport\b/.test(transformed), false, 'Classic runtime import içermemeli!');
+      assert.ok(transformed.includes('React.createElement'), 'React.createElement çağrısı üretilmeli');
+
+      // new Function ile çalıştırma kontrolü
+      const mockReact = { createElement: () => ({ type: 'div' }) };
+      const fn = new Function('React', transformed);
+      fn(mockReact);
+      resolve();
+    });
+  });
+
   // ÖZET RAPOR
   console.log('\n========================================================');
   console.log(`📊 TEST SONUÇLARI: ${passedTests} GEÇTİ, ${failedTests} BAŞARISIZ (Toplam: ${totalTests})`);
