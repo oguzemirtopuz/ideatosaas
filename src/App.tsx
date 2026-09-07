@@ -402,14 +402,14 @@ export default function App() {
       .replace(/\n```$/gm, "")
       .trim();
 
-    // 1. React importlarını React global nesnesine bağla
+    // 1. React importlarını tamamen temizle (hook'lar ve React global olarak iframe'de zaten mevcut)
     cleaned = cleaned.replace(
-      /import\s+React\s*,\s*\{([^}]+)\}\s+from\s+['"][^'"]+['"];?/g,
-      "const { $1 } = React;"
+      /import\s+React\s*,\s*\{[^}]*\}\s+from\s+['"][^'"]+['"];?/g,
+      "/* React global */"
     );
     cleaned = cleaned.replace(
-      /import\s*\{([^}]+)\}\s+from\s+['"]react['"];?/g,
-      "const { $1 } = React;"
+      /import\s*\{[^}]*\}\s+from\s+['"]react['"];?/g,
+      "/* React global */"
     );
     cleaned = cleaned.replace(
       /import\s+React\s+from\s+['"]react['"];?/g,
@@ -419,14 +419,28 @@ export default function App() {
       /import\s+\*\s+as\s+React\s+from\s+['"]react['"];?/g,
       "/* React global */"
     );
-
-    // 2. Lucide veya ikon kütüphanesi importlarını Proxy'ye bağla
     cleaned = cleaned.replace(
-      /import\s*\{([^}]+)\}\s+from\s+['"](?:lucide-react|react-icons[^'"]*)['"];?/g,
-      "const { $1 } = (window.LucideIcons || {});"
+      /import\s+['"]react['"];?/g,
+      "/* React global */"
     );
 
-    // 3. Çok satırlı veya tek satırlı kalan TÜM importları yok et
+    // 2. Lucide ve diğer ikon kütüphanelerini window.LucideIcons Proxy'sine bağla
+    cleaned = cleaned.replace(
+      /import\s*\{([^}]+)\}\s+from\s+['"](?:lucide-react|react-icons[^'"]*|@heroicons[^'"]*)['"];?/g,
+      "const { $1 } = (window.LucideIcons || {});"
+    );
+    cleaned = cleaned.replace(
+      /import\s+(?:\*\s+as\s+)?([A-Za-z0-9_$]+)\s+from\s+['"](?:lucide-react|react-icons[^'"]*|@heroicons[^'"]*)['"];?/g,
+      "const $1 = (window.LucideIcons || {});"
+    );
+
+    // 3. Dinamik import() çağrılarını sahte Promise ile değiştir
+    cleaned = cleaned.replace(
+      /\bimport\s*\([^)]*\)/g,
+      "Promise.resolve({})"
+    );
+
+    // 4. Kalan TÜM statik importları (tek satırlı, çok satırlı, from olan/olmayan, CSS vb.) yok et
     cleaned = cleaned.replace(
       /\bimport\s+[\s\S]*?from\s*['"`][^'"`]+['"`]\s*;?/g,
       ""
@@ -440,7 +454,13 @@ export default function App() {
       ""
     );
 
-    // 4. Export ifadelerini App bileşenini hedefleyecek şekilde dönüştür
+    // 5. KESİN GÜVENLİK AĞI: Kodda kalan kaçak herhangi bir import ifadesini etkisizleştir
+    cleaned = cleaned.replace(
+      /\bimport\b[^;\n]*;?/g,
+      "/* import removed */"
+    );
+
+    // 6. Export ifadelerini App bileşenini hedefleyecek şekilde dönüştür
     cleaned = cleaned.replace(
       /export\s+default\s+function\s*(\w*)/g,
       "function App"
@@ -466,7 +486,7 @@ export default function App() {
       "$1"
     );
 
-    // 5. Eğer App adında bir bileşen yoksa, büyük harfle başlayan bileşeni App olarak ata
+    // 7. Eğer App adında bir bileşen yoksa, büyük harfle başlayan bileşeni App olarak ata
     if (!/(?:function|const|var|let|class)\s+App\b/.test(cleaned)) {
       const compMatch = cleaned.match(/(?:function|class)\s+([A-Z][a-zA-Z0-9_]*)/);
       if (compMatch && compMatch[1]) {
@@ -474,19 +494,19 @@ export default function App() {
       }
     }
 
-    // 6. Düzensiz React.createElement props düzeltmeleri (onClick()=> veya onClick(e)=> -> onClick: () =>)
+    // 8. Düzensiz React.createElement props düzeltmeleri (onClick()=> veya onClick(e)=> -> onClick: () =>)
     cleaned = cleaned.replace(
       /([,{]\s*)([a-zA-Z0-9_$]+)\s*\(([^)]*)\)\s*=>/g,
       "$1$2: ($3) =>"
     );
 
-    // 7. Düzensiz JSX attribute formatlarını düzelt (onClick={() => ...} -> onClick: () => ...)
+    // 9. Düzensiz JSX attribute formatlarını düzelt (onClick={() => ...} -> onClick: () => ...)
     cleaned = cleaned.replace(
       /([,{]\s*)([a-zA-Z0-9_$]+)\s*=\s*\{(?=\s*\()/g,
       "$1$2: "
     );
 
-    // 8. Dengesiz parantez ve süslüleri otomatik dengele
+    // 10. Dengesiz parantez ve süslüleri otomatik dengele
     let openP = 0, openB = 0;
     for (const char of cleaned) {
       if (char === '(') openP++;
