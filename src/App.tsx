@@ -524,6 +524,8 @@ export default function App() {
   // Canlı Iframe Önizleme Kodu
   const getPreviewHtml = (code: string) => {
     const cleanCode = sanitizeReactCode(code);
+    // Kullanıcı kodunu güvenli JSON olarak ayrı bir veri bloğuna koyuyoruz
+    // Bu sayede ana script bloğunun parse edilmesi bozulmaz
     const safeCodeJson = JSON.stringify(cleanCode)
       .replace(/</g, '\\u003c')
       .replace(/>/g, '\\u003e');
@@ -534,10 +536,10 @@ export default function App() {
         <head>
           <meta charset="utf-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1" />
-          <script src="https://cdn.tailwindcss.com"></script>
-          <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" onerror="this.src='https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js'"></script>
-          <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" onerror="this.src='https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js'"></script>
-          <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.9/babel.min.js" onerror="this.src='https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.9/babel.min.js'"></script>
+          <script src="https://cdn.tailwindcss.com"><\/script>
+          <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" onerror="this.src='https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js'"><\/script>
+          <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" onerror="this.src='https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js'"><\/script>
+          <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.9/babel.min.js" onerror="this.src='https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.9/babel.min.js'"><\/script>
           <style>
             body { font-family: system-ui, -apple-system, sans-serif; margin: 0; min-height: 100vh; }
             #loading-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 350px; color: #737373; font-size: 13px; gap: 12px; }
@@ -553,6 +555,10 @@ export default function App() {
           <div id="root"></div>
           <div id="error-box" style="display:none; color:#991b1b; background:#fef2f2; border:1px solid #fecaca; padding:16px; border-radius:12px; font-family:monospace; font-size:12px; white-space:pre-wrap; margin-top:12px;"></div>
 
+          <!-- BLOK 1: Kullanıcı kodu güvenli JSON veri bloğu (JS parser tarafından çalıştırılmaz) -->
+          <script type="application/json" id="user-code-data">${safeCodeJson}<\/script>
+
+          <!-- BLOK 2: Hata yakalayıcılar ve mock servisler (her zaman çalışır, bozulmaz) -->
           <script>
             function showError(msg, source) {
               var loader = document.getElementById('loading-state');
@@ -563,6 +569,14 @@ export default function App() {
                 errBox.innerText = 'Çalışma Hatası: ' + msg + (source ? '\nKaynak: ' + source : '');
               }
             }
+
+            // Güvenlik zaman aşımı: 30 saniye sonra spinner hala dönüyorsa hata göster
+            window.__safetyTimer = setTimeout(function() {
+              var loader = document.getElementById('loading-state');
+              if (loader && loader.style.display !== 'none') {
+                showError('Uygulama 30 saniye içinde yüklenemedi. Lütfen "Yeniden Başlat" butonuna tıklayın veya sayfayı yenileyin.');
+              }
+            }, 30000);
 
             window.addEventListener('error', function(e) {
               if (window.__CurrentApp) {
@@ -585,14 +599,14 @@ export default function App() {
               get: function(target, prop) {
                 return function LucideFallback(props) {
                   return React.createElement('span', {
-                    className: 'inline-flex items-center justify-center ' + (props.className || ''),
+                    className: 'inline-flex items-center justify-center ' + ((props && props.className) || ''),
                     style: { display: 'inline-flex', verticalAlign: 'middle', fontSize: '1.1em' }
                   }, '✦');
                 };
               }
             });
 
-            // Supabase API çağrıları için otomatik sahte servis (ReferenceError ve crash koruması)
+            // Supabase API çağrıları için otomatik sahte servis
             window.supabase = {
               auth: {
                 getUser: async function() { return { data: { user: { id: 'demo-user-1', email: 'demo@saas.com' } }, error: null }; },
@@ -624,6 +638,12 @@ export default function App() {
               }
             };
 
+            // createClient mock (supabase-js import eden kodlar için)
+            window.createClient = function() { return window.supabase; };
+          <\/script>
+
+          <!-- BLOK 3: Uygulama derleme ve çalıştırma (ayrı script — parse hatası olursa BLOK 2 yakalar) -->
+          <script>
             var attempts = 0;
             function checkAndRun() {
               attempts++;
@@ -644,7 +664,13 @@ export default function App() {
                 var errBox = document.getElementById('error-box');
                 if (errBox) errBox.style.display = 'none';
 
-                var rawCode = ${safeCodeJson};
+                // Kullanıcı kodunu JSON veri bloğundan oku (parse güvenliği)
+                var codeDataEl = document.getElementById('user-code-data');
+                if (!codeDataEl) {
+                  showError('Kullanıcı kodu veri bloğu bulunamadı.');
+                  return;
+                }
+                var rawCode = JSON.parse(codeDataEl.textContent || '""');
 
                 // React Error Boundary tanımla
                 var ErrorBoundary = (function() {
@@ -698,6 +724,9 @@ export default function App() {
                 new Function(transformed)();
                 var ResolvedApp = window.__CurrentApp;
 
+                // Güvenlik zamanlayıcısını temizle — uygulama başarıyla yüklendi
+                if (window.__safetyTimer) clearTimeout(window.__safetyTimer);
+
                 var loader = document.getElementById('loading-state');
                 if (loader) loader.style.display = 'none';
 
@@ -709,7 +738,8 @@ export default function App() {
                   showError('Ana bileşen (App) tanımlanamadı. Lütfen AI asistanından kodu yenilemesini isteyin.');
                 }
               } catch (err) {
-                showError(err.message);
+                if (window.__safetyTimer) clearTimeout(window.__safetyTimer);
+                showError(err.message || String(err));
               }
             }
 
@@ -1002,7 +1032,7 @@ export default function App() {
                             title="App Sandbox"
                             srcDoc={getPreviewHtml(builtCode)}
                             className="w-full h-full border-0 absolute inset-0"
-                            sandbox="allow-scripts allow-modals allow-forms"
+                            sandbox="allow-scripts allow-modals allow-forms allow-same-origin"
                           />
                         </div>
                       </div>
