@@ -520,6 +520,7 @@ export default function App() {
 
   // Canlı Iframe Önizleme Kodu
   const getPreviewHtml = (code: string) => {
+    const S_END = '</' + 'script>';
     const cleanCode = sanitizeReactCode(code);
     // Kullanıcı kodunu güvenli JSON olarak ayrı bir veri bloğuna koyuyoruz
     // Bu sayede ana script bloğunun parse edilmesi bozulmaz
@@ -533,10 +534,10 @@ export default function App() {
         <head>
           <meta charset="utf-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1" />
-          <script src="https://cdn.tailwindcss.com"><\/script>
-          <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" onerror="this.src='https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js'"><\/script>
-          <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" onerror="this.src='https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js'"><\/script>
-          <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.9/babel.min.js" onerror="this.src='https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.9/babel.min.js'"><\/script>
+          <script src="https://cdn.tailwindcss.com">${S_END}
+          <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" onerror="this.src='https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js'">${S_END}
+          <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" onerror="this.src='https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js'">${S_END}
+          <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.9/babel.min.js" onerror="this.src='https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.9/babel.min.js'">${S_END}
           <style>
             body { font-family: system-ui, -apple-system, sans-serif; margin: 0; min-height: 100vh; }
             #loading-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 350px; color: #737373; font-size: 13px; gap: 12px; }
@@ -553,7 +554,7 @@ export default function App() {
           <div id="error-box" style="display:none; color:#991b1b; background:#fef2f2; border:1px solid #fecaca; padding:16px; border-radius:12px; font-family:monospace; font-size:12px; white-space:pre-wrap; margin-top:12px;"></div>
 
           <!-- BLOK 1: Kullanıcı kodu güvenli JSON veri bloğu (JS parser tarafından çalıştırılmaz) -->
-          <script type="application/json" id="user-code-data">${safeCodeJson}<\/script>
+          <script type="application/json" id="user-code-data">${safeCodeJson}${S_END}
 
           <!-- BLOK 2: Hata yakalayıcılar ve mock servisler (her zaman çalışır, bozulmaz) -->
           <script>
@@ -637,7 +638,7 @@ export default function App() {
 
             // createClient mock (supabase-js import eden kodlar için)
             window.createClient = function() { return window.supabase; };
-          <\/script>
+          ${S_END}
 
           <!-- BLOK 3: Uygulama derleme ve çalıştırma (ayrı script — parse hatası olursa BLOK 2 yakalar) -->
           <script>
@@ -699,17 +700,20 @@ export default function App() {
 
                 window.__CurrentApp = null;
 
-                // Babel ile JSX'i derle (classic runtime ile 'import { jsx }' üretilmesini engelle)
+                var codeToTransform = [
+                  "const { useState, useEffect, useMemo, useRef, useCallback } = React;",
+                  rawCode,
+                  "var _candidate = null;",
+                  "if (typeof App !== 'undefined') { _candidate = App; }",
+                  "else if (typeof Main !== 'undefined') { _candidate = Main; }",
+                  "else if (typeof SaaSApp !== 'undefined') { _candidate = SaaSApp; }",
+                  "else if (typeof Dashboard !== 'undefined') { _candidate = Dashboard; }",
+                  "else if (typeof Application !== 'undefined') { _candidate = Application; }",
+                  "window.__CurrentApp = _candidate;"
+                ].join(String.fromCharCode(10));
+
                 var transformed = window.Babel.transform(
-                  "const { useState, useEffect, useMemo, useRef, useCallback } = React;\\n" +
-                  rawCode +
-                  "\\nvar _candidate = null;\\n" +
-                  "if (typeof App !== 'undefined') { _candidate = App; }\\n" +
-                  "else if (typeof Main !== 'undefined') { _candidate = Main; }\\n" +
-                  "else if (typeof SaaSApp !== 'undefined') { _candidate = SaaSApp; }\\n" +
-                  "else if (typeof Dashboard !== 'undefined') { _candidate = Dashboard; }\\n" +
-                  "else if (typeof Application !== 'undefined') { _candidate = Application; }\\n" +
-                  "window.__CurrentApp = _candidate;",
+                  codeToTransform,
                   { presets: [['react', { runtime: 'classic' }]] }
                 ).code;
 
