@@ -507,16 +507,13 @@ export default function App() {
       "$1$2: "
     );
 
-    // 10. Dengesiz parantez ve süslüleri otomatik dengele
-    let openP = 0, openB = 0;
-    for (const char of cleaned) {
-      if (char === '(') openP++;
-      else if (char === ')') openP--;
-      else if (char === '{') openB++;
-      else if (char === '}') openB--;
-    }
-    while (openP > 0) { cleaned += ')'; openP--; }
-    while (openB > 0) { cleaned += '\n}'; openB--; }
+    // NOT: Önceden burada karakter-sayımına dayalı bir "otomatik parantez/süslü
+    // dengeleme" adımı vardı. String, JSX metni, yorum veya regex literal
+    // içindeki ( ) { } karakterlerini de saydığı için geçerli kodu bozup
+    // sessizce syntax hatasına yol açıyordu (örn. "Invalid regular expression:
+    // missing /"). Gerçek bir parser olmadan güvenli şekilde yapılamayacağı
+    // için kaldırıldı — kod gerçekten bozuksa artık Babel kendi net hatasını
+    // verecek ve bu zaten aşağıdaki catch bloğunda kullanıcıya gösteriliyor.
 
     return cleaned.trim();
   };
