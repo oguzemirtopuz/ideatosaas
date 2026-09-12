@@ -879,10 +879,14 @@ export default function App() {
                     }
                   ).code;
 
-                  // Ekstra güvenlik: derlenmiş kodda kalmış olabilecek tüm import ifadelerini temizle
-                  transformed = transformed.replace(/^import\s+[\s\S]*?from\s*['"][^'"]+['"];?/gm, '');
-                  transformed = transformed.replace(/^import\s*['"][^'"]+['"];?/gm, '');
-                  transformed = transformed.replace(/\bimport\b[^;\n]*;?/gm, '');
+                  // Ekstra güvenlik: derlenmiş kodda kalmış olabilecek tüm import satırlarını güvenle arındır
+                  transformed = transformed
+                    .split(String.fromCharCode(10))
+                    .filter(function(line) {
+                      var trimmed = line.trim();
+                      return !trimmed.startsWith('import ') && !trimmed.startsWith('import{') && !trimmed.startsWith('import"') && !trimmed.startsWith("import'");
+                    })
+                    .join(String.fromCharCode(10));
 
                   new Function(transformed)();
                   var ResolvedApp = window.__CurrentApp;
