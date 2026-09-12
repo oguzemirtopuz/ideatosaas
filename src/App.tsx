@@ -128,6 +128,19 @@ export default function App() {
   const [marketingData, setMarketingData] = useState<MarketingDecision | null>(null);
   const [marketingLoading, setMarketingLoading] = useState(false);
 
+  // Sekme Başlığı ve Favicon Zorlama (Önbellek aşımı)
+  useEffect(() => {
+    document.title = 'ideatosaas';
+    let link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
+    if (!link) {
+      link = document.createElement('link');
+      link.rel = 'icon';
+      document.head.appendChild(link);
+    }
+    link.type = 'image/svg+xml';
+    link.href = '/favicon.svg?v=2';
+  }, []);
+
   // İlk Açılışta Otomatik 3 Fikir Getir
   useEffect(() => {
     generateIdeas();
