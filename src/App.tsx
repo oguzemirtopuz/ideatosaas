@@ -302,10 +302,21 @@ export default function App() {
       if (!res.ok) throw new Error(data.error || 'Uygulama kodu üretilemedi');
       setBuiltCode(data.code);
       setActiveTab('preview');
+      
+      // v1 sınırında bırakılan maddeleri AI karşılama mesajına dahil et
+      let initialAiText = `"${selectedIdea.title}" uygulamasını şartnameye göre inşa ettim! 🚀\n\n`;
+      if (spec.outOfScope && spec.outOfScope.length > 0) {
+        initialAiText += `v1 sınırında şu özellikleri kapsam dışı bırakmıştık, istersen şimdi yapabilirim:\n` +
+          spec.outOfScope.map((item: string) => `• ${item}`).join('\n') +
+          `\n\nBunlardan birini eklemek veya arayüzde değiştirmek istediğin başka bir yer varsa bana yazabilirsin!`;
+      } else {
+        initialAiText += `Beğenmediğin bir yer veya eklemek istediğin bir özellik varsa bana yazabilirsin.`;
+      }
+
       setChatMessages([
         {
           sender: 'ai',
-          text: `"${selectedIdea.title}" uygulamasını şartnameye göre inşa ettim! Beğenmediğin bir yer veya eklemek istediğin bir özellik varsa bana yazabilirsin.`,
+          text: initialAiText,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
       ]);
@@ -461,7 +472,26 @@ export default function App() {
     setSelectedIdea(p.idea);
     setSpec(p.spec);
     setBuiltCode(p.code);
-    setChatMessages(p.chatHistory || []);
+    
+    // Eğer geçmişte chat mesajı yoksa v1 sınırını içeren bilgilendirme mesajı oluştur
+    if (!p.chatHistory || p.chatHistory.length === 0) {
+      let initialAiText = `"${p.idea.title}" projesini geri yükledim! 🚀\n\n`;
+      if (p.spec?.outOfScope && p.spec.outOfScope.length > 0) {
+        initialAiText += `v1 sınırında şu özellikleri kapsam dışı bırakmıştık, istersen şimdi yapabilirim:\n` +
+          p.spec.outOfScope.map((item: string) => `• ${item}`).join('\n') +
+          `\n\nBunlardan birini eklemek veya değiştirmek istediğin başka bir yer varsa bana yazabilirsin!`;
+      } else {
+        initialAiText += `Beğenmediğin bir yer veya eklemek istediğin bir özellik varsa bana yazabilirsin.`;
+      }
+      setChatMessages([{
+        sender: 'ai',
+        text: initialAiText,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }]);
+    } else {
+      setChatMessages(p.chatHistory);
+    }
+
     setActiveTab('preview');
     setShowHistoryModal(false);
   };
@@ -1272,7 +1302,7 @@ export default function App() {
                               className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}
                             >
                               <div
-                                className={`p-3 rounded-xl max-w-[88%] leading-relaxed ${
+                                className={`p-3 rounded-xl max-w-[88%] leading-relaxed whitespace-pre-line ${
                                   msg.sender === 'user'
                                     ? 'bg-neutral-900 text-white rounded-br-none'
                                     : 'bg-white border border-neutral-200 text-neutral-800 rounded-bl-none shadow-xs'
@@ -1292,6 +1322,30 @@ export default function App() {
                         </div>
 
                         {/* İstem Girişi Formu */}
+                        {/* v1 Sınırında Kapsam Dışı Bırakılanlar - Hızlı İsteme Ekleme Çipleri */}
+                        {spec?.outOfScope && spec.outOfScope.length > 0 && (
+                          <div className="px-3.5 py-2.5 border-t border-neutral-200/80 bg-neutral-100/70">
+                            <div className="text-[10px] text-neutral-500 font-semibold mb-1.5 flex items-center gap-1">
+                              <Sparkles className="w-3 h-3 text-indigo-600" />
+                              <span>v1 Sınırı Hızlı Ekle:</span>
+                            </div>
+                            <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                              {spec.outOfScope.map((item, idx) => (
+                                <button
+                                  key={idx}
+                                  type="button"
+                                  onClick={() => setChatInput('v1 sınırında bıraktığımız şu özelliği uygulamaya ekle: ' + item)}
+                                  className="text-[10px] px-2.5 py-1 bg-white border border-neutral-200 text-neutral-700 rounded-lg hover:bg-neutral-50 hover:border-neutral-300 transition-colors text-left truncate max-w-full cursor-pointer shadow-2xs font-medium flex items-center gap-1"
+                                  title={'İsteme ekle: ' + item}
+                                >
+                                  <span className="text-indigo-600 font-bold">+</span>
+                                  <span>{item}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
                         <form onSubmit={handleSendPromptModification} className="p-3 border-t border-neutral-200 bg-white">
                           <div className="flex items-center gap-2">
                             <input
