@@ -604,7 +604,6 @@ export default function App() {
     const S_END = '</' + 'script>';
     const cleanCode = sanitizeReactCode(code);
     // Kullanıcı kodunu güvenli JSON olarak ayrı bir veri bloğuna koyuyoruz
-    // Bu sayede ana script bloğunun parse edilmesi bozulmaz
     const safeCodeJson = JSON.stringify(cleanCode)
       .replace(/</g, '\\u003c')
       .replace(/>/g, '\\u003e');
@@ -615,244 +614,301 @@ export default function App() {
         <head>
           <meta charset="utf-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <title>Live App Sandbox</title>
+          
+          <!-- 1. ADIM: İLK VE ANINDA ÇALIŞAN HATA YAKALAYICI VE GÜVENLİK ZAMANLAYICISI -->
+          <script>
+            (function() {
+              window.__step = function(msg) {
+                var el = document.getElementById('loading-step-text');
+                if (el) el.innerText = msg;
+              };
+
+              window.showError = function(msg, source) {
+                if (window.__safetyTimer) clearTimeout(window.__safetyTimer);
+                var loader = document.getElementById('loading-state');
+                if (loader) loader.style.display = 'none';
+                var errBox = document.getElementById('error-box');
+                if (errBox) {
+                  errBox.style.display = 'block';
+                  errBox.innerHTML = '<div style="font-weight:700; font-size:13px; margin-bottom:8px; color:#991b1b; display:flex; align-items:center; gap:6px;">' +
+                    '<span>⚠️</span><span>Uygulama Çalıştırma Hatası</span></div>' +
+                    '<div style="font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; font-size:11px; background:#fff; border:1px solid #fecaca; padding:10px; border-radius:8px; overflow-x:auto;">' +
+                    String(msg).replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>' +
+                    (source ? '<div style="color:#b91c1c; font-size:11px; margin-top:8px;">Kaynak: ' + String(source).replace(/</g, '&lt;') + '</div>' : '') +
+                    '<div style="margin-top:14px; display:flex; gap:8px;">' +
+                    '<button onclick="location.reload()" style="padding:6px 14px; background:#171717; color:#fff; border:none; border-radius:8px; font-size:11px; font-weight:600; cursor:pointer;">Yeniden Başlat</button>' +
+                    '</div>';
+                }
+              };
+
+              window.onerror = function(message, source, lineno, colno, error) {
+                if (window.__CurrentApp) return;
+                window.showError(message || (error && error.message) || 'Bilinmeyen script hatası', source ? source + ':' + lineno : '');
+              };
+
+              window.onunhandledrejection = function(e) {
+                if (window.__CurrentApp) return;
+                window.showError(e.reason ? (e.reason.message || String(e.reason)) : 'Bilinmeyen asenkron hata');
+              };
+
+              // Güvenlik kilidi: 12 saniye içinde render edilmezse kullanıcıyı bilgilendir
+              window.__safetyTimer = setTimeout(function() {
+                var loader = document.getElementById('loading-state');
+                if (loader && loader.style.display !== 'none') {
+                  window.showError('Uygulama zamanında başlatılamadı. Kütüphaneler veya derleme beklenenden uzun sürdü. Lütfen "Yeniden Başlat" butonuna tıklayın.');
+                }
+              }, 12000);
+            })();
+          ${S_END}
+
           <script src="https://cdn.tailwindcss.com">${S_END}
-          <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" onerror="this.src='https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js'">${S_END}
-          <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" onerror="this.src='https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js'">${S_END}
-          <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.9/babel.min.js" onerror="this.src='https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.9/babel.min.js'">${S_END}
           <style>
-            body { font-family: system-ui, -apple-system, sans-serif; margin: 0; min-height: 100vh; }
-            #loading-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 350px; color: #737373; font-size: 13px; gap: 12px; }
-            .spinner { width: 28px; height: 28px; border: 3px solid #e5e5e5; border-top-color: #171717; border-radius: 50%; animation: spin 0.8s linear infinite; }
+            body { font-family: system-ui, -apple-system, sans-serif; margin: 0; min-height: 100vh; background-color: #fafafa; }
+            #loading-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 350px; color: #525252; font-size: 13px; gap: 12px; }
+            .spinner { width: 30px; height: 30px; border: 3px solid #e5e5e5; border-top-color: #171717; border-radius: 50%; animation: spin 0.8s linear infinite; }
             @keyframes spin { to { transform: rotate(360deg); } }
+            #loading-step-text { font-size: 11px; color: #737373; font-weight: 400; }
+            #error-box { display:none; color:#991b1b; background:#fef2f2; border:1px solid #fecaca; padding:18px; border-radius:14px; margin:20px; line-height:1.5; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
           </style>
         </head>
         <body class="bg-neutral-50 p-4">
           <div id="loading-state">
             <div class="spinner"></div>
-            <span class="font-medium">Uygulama derleniyor ve başlatılıyor...</span>
+            <span class="font-semibold text-neutral-800">Uygulama derleniyor ve başlatılıyor...</span>
+            <span id="loading-step-text">Gerekli kütüphaneler hazırlanıyor...</span>
           </div>
           <div id="root"></div>
-          <div id="error-box" style="display:none; color:#991b1b; background:#fef2f2; border:1px solid #fecaca; padding:16px; border-radius:12px; font-family:monospace; font-size:12px; white-space:pre-wrap; margin-top:12px;"></div>
+          <div id="error-box"></div>
 
-          <!-- BLOK 1: Kullanıcı kodu güvenli JSON veri bloğu (JS parser tarafından çalıştırılmaz) -->
+          <!-- Kullanıcı kodu güvenli JSON veri bloğu -->
           <script type="application/json" id="user-code-data">${safeCodeJson}${S_END}
 
-          <!-- BLOK 2: Hata yakalayıcılar ve mock servisler (her zaman çalışır, bozulmaz) -->
+          <!-- Çekirdek Yükleyici ve Çalıştırıcı -->
           <script>
-            function showError(msg, source) {
-              var loader = document.getElementById('loading-state');
-              if (loader) loader.style.display = 'none';
-              var errBox = document.getElementById('error-box');
-              if (errBox) {
-                errBox.style.display = 'block';
-                errBox.innerText = 'Çalışma Hatası: ' + msg + (source ? '\nKaynak: ' + source : '');
-              }
-            }
-
-            // Güvenlik zaman aşımı: 30 saniye sonra spinner hala dönüyorsa hata göster
-            window.__safetyTimer = setTimeout(function() {
-              var loader = document.getElementById('loading-state');
-              if (loader && loader.style.display !== 'none') {
-                showError('Uygulama 30 saniye içinde yüklenemedi. Lütfen "Yeniden Başlat" butonuna tıklayın veya sayfayı yenileyin.');
-              }
-            }, 30000);
-
-            window.addEventListener('error', function(e) {
-              if (window.__CurrentApp) {
-                console.warn("Harici uyarı (uygulama çalışıyor):", e.message);
-                return;
-              }
-              showError(e.error ? e.error.message : e.message, (e.filename ? e.filename + ':' + e.lineno : 'global'));
-            });
-
-            window.addEventListener('unhandledrejection', function(e) {
-              if (window.__CurrentApp) {
-                console.warn("Harici asenkron uyarı (uygulama çalışıyor):", e.reason);
-                return;
-              }
-              showError(e.reason ? (e.reason.message || String(e.reason)) : 'Bilinmeyen asenkron hata');
-            });
-
-            // Harici ikonlar için otomatik çökme koruması
-            window.LucideIcons = new Proxy({}, {
-              get: function(target, prop) {
-                return function LucideFallback(props) {
-                  return React.createElement('span', {
-                    className: 'inline-flex items-center justify-center ' + ((props && props.className) || ''),
-                    style: { display: 'inline-flex', verticalAlign: 'middle', fontSize: '1.1em' }
-                  }, '✦');
-                };
-              }
-            });
-
-            // Supabase API çağrıları için otomatik sahte servis
-            window.supabase = {
-              auth: {
-                getUser: async function() { return { data: { user: { id: 'demo-user-1', email: 'demo@saas.com' } }, error: null }; },
-                getSession: async function() { return { data: { session: {} }, error: null }; },
-                signInWithPassword: async function() { return { data: { user: { id: 'demo-user-1' } }, error: null }; },
-                signUp: async function() { return { data: { user: { id: 'demo-user-1' } }, error: null }; },
-                signOut: async function() { return { error: null }; },
-                deleteUser: async function() { return { error: null }; },
-                onAuthStateChange: function() { return { data: { subscription: { unsubscribe: function() {} } } }; }
-              },
-              from: function(tableName) {
-                var chain = {
-                  select: function() { return chain; },
-                  insert: function() { return chain; },
-                  update: function() { return chain; },
-                  delete: function() { return chain; },
-                  eq: function() { return chain; },
-                  neq: function() { return chain; },
-                  gt: function() { return chain; },
-                  lt: function() { return chain; },
-                  order: function() { return chain; },
-                  limit: function() { return chain; },
-                  single: function() { return Promise.resolve({ data: {}, error: null }); },
-                  then: function(onSuccess, onError) {
-                    return Promise.resolve({ data: [], error: null }).then(onSuccess, onError);
-                  }
-                };
-                return chain;
-              }
-            };
-
-            // createClient mock (supabase-js import eden kodlar için)
-            window.createClient = function() { return window.supabase; };
-          ${S_END}
-
-          <!-- BLOK 3: Uygulama derleme ve çalıştırma (ayrı script — parse hatası olursa BLOK 2 yakalar) -->
-          <script>
-            var attempts = 0;
-            function checkAndRun() {
-              attempts++;
-              if (!window.Babel || !window.React || !window.ReactDOM) {
-                if (attempts === 15) {
-                  var loaderText = document.querySelector('#loading-state span');
-                  if (loaderText) loaderText.innerText = 'Kütüphaneler indiriliyor (Cloudflare CDN)...';
-                }
-                if (attempts < 120) {
-                  setTimeout(checkAndRun, 100);
-                } else {
-                  showError('Kütüphaneler yüklenemedi (React/Babel CDN zaman aşımı). Lütfen internet bağlantınızı kontrol edip önizlemeyi yenileyin.');
-                }
-                return;
-              }
-
-              try {
-                var errBox = document.getElementById('error-box');
-                if (errBox) errBox.style.display = 'none';
-
-                // Kullanıcı kodunu JSON veri bloğundan oku (parse güvenliği)
-                var codeDataEl = document.getElementById('user-code-data');
-                if (!codeDataEl) {
-                  showError('Kullanıcı kodu veri bloğu bulunamadı.');
-                  return;
-                }
-                var rawCode = JSON.parse(codeDataEl.textContent || '""');
-
-                // React Error Boundary tanımla
-                var ErrorBoundary = (function() {
-                  function EB(props) {
-                    React.Component.call(this, props);
-                    this.state = { hasError: false, error: null };
-                  }
-                  EB.prototype = Object.create(React.Component.prototype);
-                  EB.prototype.constructor = EB;
-                  EB.getDerivedStateFromError = function(err) {
-                    return { hasError: true, error: err };
+            (function() {
+              // Harici ikonlar ve mock servisler
+              window.LucideIcons = new Proxy({}, {
+                get: function(target, prop) {
+                  return function LucideFallback(props) {
+                    if (!window.React) return null;
+                    return window.React.createElement('span', {
+                      className: 'inline-flex items-center justify-center ' + ((props && props.className) || ''),
+                      style: { display: 'inline-flex', verticalAlign: 'middle', fontSize: '1.1em' }
+                    }, '✦');
                   };
-                  EB.prototype.componentDidCatch = function(err, info) {
-                    console.error("Component Error:", err, info);
-                  };
-                  EB.prototype.render = function() {
-                    if (this.state.hasError) {
-                      return React.createElement('div', {
-                        className: 'p-6 bg-red-50 border border-red-200 rounded-xl text-red-900 font-sans m-2'
-                      }, [
-                        React.createElement('h3', { className: 'font-bold text-sm text-red-900 mb-1', key: 'title' }, 'Bileşen Çalışma Hatası:'),
-                        React.createElement('pre', { className: 'text-xs text-red-700 whitespace-pre-wrap font-mono mt-2', key: 'msg' }, this.state.error ? (this.state.error.message || String(this.state.error)) : 'Bilinmeyen hata')
-                      ]);
+                }
+              });
+
+              window.supabase = {
+                auth: {
+                  getUser: async function() { return { data: { user: { id: 'demo-user-1', email: 'demo@saas.com' } }, error: null }; },
+                  getSession: async function() { return { data: { session: {} }, error: null }; },
+                  signInWithPassword: async function() { return { data: { user: { id: 'demo-user-1' } }, error: null }; },
+                  signUp: async function() { return { data: { user: { id: 'demo-user-1' } }, error: null }; },
+                  signOut: async function() { return { error: null }; },
+                  deleteUser: async function() { return { error: null }; },
+                  onAuthStateChange: function() { return { data: { subscription: { unsubscribe: function() {} } } }; }
+                },
+                from: function(tableName) {
+                  var chain = {
+                    select: function() { return chain; },
+                    insert: function() { return chain; },
+                    update: function() { return chain; },
+                    delete: function() { return chain; },
+                    eq: function() { return chain; },
+                    neq: function() { return chain; },
+                    gt: function() { return chain; },
+                    lt: function() { return chain; },
+                    order: function() { return chain; },
+                    limit: function() { return chain; },
+                    single: function() { return Promise.resolve({ data: {}, error: null }); },
+                    then: function(onSuccess, onError) {
+                      return Promise.resolve({ data: [], error: null }).then(onSuccess, onError);
                     }
-                    return this.props.children;
                   };
-                  return EB;
-                })();
-
-                // React hook'larını window seviyesinde hazırla
-                window.useState = React.useState;
-                window.useEffect = React.useEffect;
-                window.useMemo = React.useMemo;
-                window.useRef = React.useRef;
-                window.useCallback = React.useCallback;
-                window.useContext = React.useContext;
-                window.useReducer = React.useReducer;
-                window.useId = React.useId;
-
-                // Kod içindeki mükerrer const { useState } = React bildirimlerini temizle
-                rawCode = rawCode.replace(/(?:const|let|var)\s*\{[^}]*\}\s*=\s*React;?/g, '/* React hooks global */');
-
-                // Kod içindeki tüm potansiyel PascalCase ikon veya alt bileşenleri yakala ve güvenli ata
-                var detectedIcons = Array.from(new Set(rawCode.match(/<([A-Z][a-zA-Z0-9_]*)/g) || []))
-                  .map(function(t) { return t.slice(1); })
-                  .filter(function(t) { return !['App', 'Main', 'React', 'Fragment', 'ErrorBoundary'].includes(t); });
-
-                var iconDeclarations = detectedIcons.map(function(name) {
-                  return "if (typeof " + name + " === 'undefined') { var " + name + " = window.LucideIcons['" + name + "']; }";
-                }).join(String.fromCharCode(10));
-
-                window.__CurrentApp = null;
-
-                var codeToTransform = [
-                  "var useState = React.useState, useEffect = React.useEffect, useMemo = React.useMemo, useRef = React.useRef, useCallback = React.useCallback;",
-                  iconDeclarations,
-                  rawCode,
-                  "var _candidate = null;",
-                  "if (typeof App !== 'undefined') { _candidate = App; }",
-                  "else if (typeof Main !== 'undefined') { _candidate = Main; }",
-                  "else if (typeof SaaSApp !== 'undefined') { _candidate = SaaSApp; }",
-                  "else if (typeof Dashboard !== 'undefined') { _candidate = Dashboard; }",
-                  "else if (typeof Application !== 'undefined') { _candidate = Application; }",
-                  "window.__CurrentApp = _candidate;"
-                ].join(String.fromCharCode(10));
-
-                var transformed = window.Babel.transform(
-                  codeToTransform,
-                  { 
-                    filename: 'app.tsx',
-                    presets: ['typescript', ['react', { runtime: 'classic' }]] 
-                  }
-                ).code;
-
-                // Ekstra güvenlik: derlenmiş kodda kalmış tüm import ifadelerini temizle
-                transformed = transformed.replace(/^import\s+[\s\S]*?from\s*['"][^'"]+['"];?/gm, '');
-                transformed = transformed.replace(/^import\s*['"][^'"]+['"];?/gm, '');
-                transformed = transformed.replace(/\bimport\b[^;\n]*;?/gm, '');
-
-                new Function(transformed)();
-                var ResolvedApp = window.__CurrentApp;
-
-                // Güvenlik zamanlayıcısını temizle — uygulama başarıyla yüklendi
-                if (window.__safetyTimer) clearTimeout(window.__safetyTimer);
-
-                var loader = document.getElementById('loading-state');
-                if (loader) loader.style.display = 'none';
-
-                if (ResolvedApp) {
-                  var rootEl = document.getElementById('root');
-                  var root = ReactDOM.createRoot(rootEl);
-                  root.render(React.createElement(ErrorBoundary, null, React.createElement(ResolvedApp)));
-                } else {
-                  showError('Ana bileşen (App) tanımlanamadı. Lütfen AI asistanından kodu yenilemesini isteyin.');
+                  return chain;
                 }
-              } catch (err) {
-                if (window.__safetyTimer) clearTimeout(window.__safetyTimer);
-                showError(err.message || String(err));
-              }
-            }
+              };
+              window.createClient = function() { return window.supabase; };
 
-            checkAndRun();
-          </script>
+              // Scriptleri dinamik, sıra duyarlı ve fallback destekli yükleyen fonksiyon
+              function loadScriptSequential(urls, name) {
+                return new Promise(function(resolve, reject) {
+                  var idx = 0;
+                  function tryLoad() {
+                    if (idx >= urls.length) {
+                      reject(new Error(name + ' kütüphanesi hiçbir kaynaktan yüklenemedi.'));
+                      return;
+                    }
+                    var url = urls[idx++];
+                    var s = document.createElement('script');
+                    s.src = url;
+                    s.onload = function() { resolve(); };
+                    s.onerror = function() {
+                      console.warn(name + ' ' + url + ' üzerinden yüklenemedi, alternatif deneniyor...');
+                      s.remove();
+                      tryLoad();
+                    };
+                    document.head.appendChild(s);
+                  }
+                  tryLoad();
+                });
+              }
+
+              async function launchApp() {
+                try {
+                  // 1. React Motoru
+                  if (!window.React) {
+                    window.__step('React motoru yükleniyor...');
+                    await loadScriptSequential([
+                      '/vendor/react.production.min.js',
+                      'https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js',
+                      'https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js',
+                      'https://unpkg.com/react@18.2.0/umd/react.production.min.js'
+                    ], 'React');
+                  }
+
+                  // 2. React DOM Motoru
+                  if (!window.ReactDOM) {
+                    window.__step('React DOM motoru yükleniyor...');
+                    await loadScriptSequential([
+                      '/vendor/react-dom.production.min.js',
+                      'https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js',
+                      'https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js',
+                      'https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js'
+                    ], 'ReactDOM');
+                  }
+
+                  // 3. Babel Standalone Derleyici
+                  if (!window.Babel) {
+                    window.__step('Babel derleyici hazırlanıyor...');
+                    await loadScriptSequential([
+                      '/vendor/babel.min.js',
+                      'https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.9/babel.min.js',
+                      'https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.9/babel.min.js',
+                      'https://unpkg.com/@babel/standalone@7.26.9/babel.min.js'
+                    ], 'Babel');
+                  }
+
+                  window.__step('Uygulama kodu derleniyor ve bağlanıyor...');
+
+                  // Kullanıcı kodunu güvenli JSON bloğundan al
+                  var codeDataEl = document.getElementById('user-code-data');
+                  if (!codeDataEl) {
+                    window.showError('Kullanıcı kodu veri bloğu bulunamadı.');
+                    return;
+                  }
+                  var rawCode = JSON.parse(codeDataEl.textContent || '""');
+
+                  // React Error Boundary
+                  var ErrorBoundary = (function() {
+                    function EB(props) {
+                      React.Component.call(this, props);
+                      this.state = { hasError: false, error: null };
+                    }
+                    EB.prototype = Object.create(React.Component.prototype);
+                    EB.prototype.constructor = EB;
+                    EB.getDerivedStateFromError = function(err) {
+                      return { hasError: true, error: err };
+                    };
+                    EB.prototype.componentDidCatch = function(err, info) {
+                      console.error("Bileşen Çalışma Hatası:", err, info);
+                    };
+                    EB.prototype.render = function() {
+                      if (this.state.hasError) {
+                        return React.createElement('div', {
+                          className: 'p-6 bg-red-50 border border-red-200 rounded-xl text-red-900 font-sans m-3'
+                        }, [
+                          React.createElement('h3', { className: 'font-bold text-sm text-red-900 mb-1', key: 'title' }, 'Bileşen Çalışma Hatası:'),
+                          React.createElement('pre', { className: 'text-xs text-red-700 whitespace-pre-wrap font-mono mt-2', key: 'msg' }, this.state.error ? (this.state.error.message || String(this.state.error)) : 'Bilinmeyen hata'),
+                          React.createElement('button', {
+                            key: 'btn',
+                            className: 'mt-3 px-3 py-1.5 bg-neutral-900 text-white rounded-lg text-xs font-medium cursor-pointer',
+                            onClick: function() { location.reload(); }
+                          }, 'Yeniden Yükle')
+                        ]);
+                      }
+                      return this.props.children;
+                    };
+                    return EB;
+                  })();
+
+                  // React hook'larını window seviyesinde hazırla
+                  window.useState = React.useState;
+                  window.useEffect = React.useEffect;
+                  window.useMemo = React.useMemo;
+                  window.useRef = React.useRef;
+                  window.useCallback = React.useCallback;
+                  window.useContext = React.useContext;
+                  window.useReducer = React.useReducer;
+                  window.useId = React.useId;
+
+                  // Kod içindeki mükerrer const { useState } = React bildirimlerini temizle
+                  rawCode = rawCode.replace(/(?:const|let|var)\s*\{[^}]*\}\s*=\s*React;?/g, '/* React hooks global */');
+
+                  // Kod içindeki tüm PascalCase ikon veya alt bileşenleri yakala
+                  var detectedIcons = Array.from(new Set(rawCode.match(/<([A-Z][a-zA-Z0-9_]*)/g) || []))
+                    .map(function(t) { return t.slice(1); })
+                    .filter(function(t) { return !['App', 'Main', 'React', 'Fragment', 'ErrorBoundary'].includes(t); });
+
+                  var iconDeclarations = detectedIcons.map(function(name) {
+                    return "if (typeof " + name + " === 'undefined') { var " + name + " = window.LucideIcons['" + name + "']; }";
+                  }).join(String.fromCharCode(10));
+
+                  window.__CurrentApp = null;
+
+                  var codeToTransform = [
+                    "var useState = React.useState, useEffect = React.useEffect, useMemo = React.useMemo, useRef = React.useRef, useCallback = React.useCallback;",
+                    iconDeclarations,
+                    rawCode,
+                    "var _candidate = null;",
+                    "if (typeof App !== 'undefined') { _candidate = App; }",
+                    "else if (typeof Main !== 'undefined') { _candidate = Main; }",
+                    "else if (typeof SaaSApp !== 'undefined') { _candidate = SaaSApp; }",
+                    "else if (typeof Dashboard !== 'undefined') { _candidate = Dashboard; }",
+                    "else if (typeof Application !== 'undefined') { _candidate = Application; }",
+                    "window.__CurrentApp = _candidate;"
+                  ].join(String.fromCharCode(10));
+
+                  var transformed = window.Babel.transform(
+                    codeToTransform,
+                    { 
+                      filename: 'app.tsx',
+                      presets: ['typescript', ['react', { runtime: 'classic' }]] 
+                    }
+                  ).code;
+
+                  // Ekstra güvenlik: derlenmiş kodda kalmış olabilecek tüm import ifadelerini temizle
+                  transformed = transformed.replace(/^import\s+[\s\S]*?from\s*['"][^'"]+['"];?/gm, '');
+                  transformed = transformed.replace(/^import\s*['"][^'"]+['"];?/gm, '');
+                  transformed = transformed.replace(/\bimport\b[^;\n]*;?/gm, '');
+
+                  new Function(transformed)();
+                  var ResolvedApp = window.__CurrentApp;
+
+                  // Başarıyla bitti, güvenlik sayacını durdur ve loader'ı gizle
+                  if (window.__safetyTimer) clearTimeout(window.__safetyTimer);
+                  var loader = document.getElementById('loading-state');
+                  if (loader) loader.style.display = 'none';
+
+                  if (ResolvedApp) {
+                    var rootEl = document.getElementById('root');
+                    var root = ReactDOM.createRoot(rootEl);
+                    root.render(React.createElement(ErrorBoundary, null, React.createElement(ResolvedApp)));
+                  } else {
+                    window.showError('Ana bileşen (App) tanımlanamadı. Lütfen AI asistanından kodu yenilemesini isteyin.');
+                  }
+                } catch (err) {
+                  console.error("Sandbox derleme/çalıştırma hatası:", err);
+                  window.showError(err.message || String(err));
+                }
+              }
+
+              // Başlat
+              launchApp();
+            })();
+          ${S_END}
         </body>
       </html>
     `;

@@ -443,6 +443,45 @@ async function testApiEndpoints() {
     });
   });
 
+  // Test 3.5: Yerel vendor dosyalarının varlığı ve bütünlüğü
+  await new Promise((resolve) => {
+    runTest('Sandbox: Yerel vendor dosyaları (React, ReactDOM, Babel) eksiksiz mevcut', async () => {
+      const fs = await import('fs');
+      const path = await import('path');
+      const vendorDir = path.join(process.cwd(), 'public', 'vendor');
+      
+      const reactPath = path.join(vendorDir, 'react.production.min.js');
+      const reactDomPath = path.join(vendorDir, 'react-dom.production.min.js');
+      const babelPath = path.join(vendorDir, 'babel.min.js');
+
+      assert.ok(fs.existsSync(reactPath), 'react.production.min.js mevcut olmalı');
+      assert.ok(fs.existsSync(reactDomPath), 'react-dom.production.min.js mevcut olmalı');
+      assert.ok(fs.existsSync(babelPath), 'babel.min.js mevcut olmalı');
+
+      assert.ok(fs.statSync(reactPath).size > 5000, 'React dosyası geçerli boyutta olmalı');
+      assert.ok(fs.statSync(reactDomPath).size > 50000, 'ReactDOM dosyası geçerli boyutta olmalı');
+      assert.ok(fs.statSync(babelPath).size > 1000000, 'Babel dosyası geçerli boyutta olmalı');
+      resolve();
+    });
+  });
+
+  // Test 3.6: App.tsx içindeki getPreviewHtml mimari zırhı
+  await new Promise((resolve) => {
+    runTest('Sandbox: getPreviewHtml yerel vendor, CDN fallback ve erken hata yakalayıcı barındırır', async () => {
+      const fs = await import('fs');
+      const path = await import('path');
+      const appTsx = fs.readFileSync(path.join(process.cwd(), 'src', 'App.tsx'), 'utf-8');
+
+      assert.ok(appTsx.includes('/vendor/react.production.min.js'), 'Yerel React vendor yolu bulunmalı');
+      assert.ok(appTsx.includes('/vendor/react-dom.production.min.js'), 'Yerel ReactDOM vendor yolu bulunmalı');
+      assert.ok(appTsx.includes('/vendor/babel.min.js'), 'Yerel Babel vendor yolu bulunmalı');
+      assert.ok(appTsx.includes('loadScriptSequential'), 'Dayanıklı sıralı yükleyici bulunmalı');
+      assert.ok(appTsx.includes('window.__step'), 'Kullanıcı adım durum bildirimleri bulunmalı');
+      assert.ok(appTsx.includes('window.onerror'), 'Erken hata yakalayıcı bulunmalı');
+      resolve();
+    });
+  });
+
   // -------------------------------------------------------------
   // GRUP 4: ZIP PAKETLEME VE DOSYA DIŞA AKTARMA TESTLERİ
   // -------------------------------------------------------------
