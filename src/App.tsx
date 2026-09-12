@@ -173,21 +173,35 @@ export default function App() {
     }
   }, [builtCode, chatMessages]);
 
+  const getEffectiveApiKey = (): string => {
+    return customApiKey.trim() || (typeof window !== 'undefined' ? localStorage.getItem('user_custom_groq_api_key')?.trim() : '') || '';
+  };
+
   const getApiHeaders = () => {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
-    if (customApiKey.trim()) {
-      headers['x-groq-api-key'] = customApiKey.trim();
+    const key = getEffectiveApiKey();
+    if (key) {
+      headers['x-groq-api-key'] = key;
     }
     return headers;
   };
 
   const checkQuotaExceeded = (data: any, status?: number) => {
+    const currentKey = getEffectiveApiKey();
     if (status === 429 || data?.isQuotaExceeded) {
-      setQuotaWarning(
-        "AI quota or rate limit reached. The system is operating with backup templates. You can provide your own free Groq API key in Account Settings for unlimited access."
-      );
+      if (currentKey) {
+        setQuotaWarning(
+          "Girilen özel Groq API anahtarınızda kota veya yetki sorunu oluştu. Lütfen anahtarınızı Hesap & API Ayarları bölümünden kontrol edin."
+        );
+      } else {
+        setQuotaWarning(
+          "Sistemin varsayılan ücretsiz AI kotası doldu. Kesintisiz kullanım için Hesap & API Ayarları bölümünden kendi ücretsiz Groq anahtarınızı girebilirsiniz."
+        );
+      }
+    } else if (data && !data.isQuotaExceeded && status !== 429) {
+      setQuotaWarning(null);
     }
   };
 
@@ -230,11 +244,15 @@ export default function App() {
     setChatMessages([]);
     
     try {
-      const body = customIdea.trim() ? { customIdea: customIdea.trim() } : undefined;
+      const effectiveKey = getEffectiveApiKey();
+      const body = {
+        customIdea: customIdea.trim() || undefined,
+        customApiKey: effectiveKey || undefined
+      };
       const response = await fetch('/api/generate-ideas', { 
         method: 'POST',
         headers: getApiHeaders(),
-        body: body ? JSON.stringify(body) : undefined
+        body: JSON.stringify(body)
       });
       const data = await response.json();
       checkQuotaExceeded(data, response.status);
@@ -272,7 +290,7 @@ export default function App() {
       const res = await fetch('/api/generate-spec', {
         method: 'POST',
         headers: getApiHeaders(),
-        body: JSON.stringify({ idea })
+        body: JSON.stringify({ idea, customApiKey: getEffectiveApiKey() || undefined })
       });
       const data = await res.json();
       checkQuotaExceeded(data, res.status);
@@ -295,7 +313,7 @@ export default function App() {
       const res = await fetch('/api/build-app', {
         method: 'POST',
         headers: getApiHeaders(),
-        body: JSON.stringify({ idea: selectedIdea, spec })
+        body: JSON.stringify({ idea: selectedIdea, spec, customApiKey: getEffectiveApiKey() || undefined })
       });
       const data = await res.json();
       checkQuotaExceeded(data, res.status);
@@ -350,7 +368,8 @@ export default function App() {
         body: JSON.stringify({
           currentCode: builtCode,
           userPrompt: userText,
-          ideaTitle: selectedIdea?.title
+          ideaTitle: selectedIdea?.title,
+          customApiKey: getEffectiveApiKey() || undefined
         })
       });
       const data = await res.json();
@@ -386,7 +405,7 @@ export default function App() {
       const res = await fetch('/api/generate-marketing-decision', {
         method: 'POST',
         headers: getApiHeaders(),
-        body: JSON.stringify({ idea: selectedIdea, spec })
+        body: JSON.stringify({ idea: selectedIdea, spec, customApiKey: getEffectiveApiKey() || undefined })
       });
       const data = await res.json();
       checkQuotaExceeded(data, res.status);
@@ -1758,8 +1777,7 @@ export default function App() {
                     type="email"
                     value={inputEmail}
                     onChange={(e) => setInputEmail(e.target.value)}
-                    placeholder="eposta@ornek.com"
-                    required
+                    placeholder="eposta@ornek.com (İsteğe bağlı)"
                     className="w-full px-3.5 py-2.5 border border-neutral-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-neutral-900"
                   />
                 </div>
