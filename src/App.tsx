@@ -368,12 +368,12 @@ export default function App() {
     }
   };
 
-  // AI Canlı Kod Düzenleme (Chat Refine)
-  const handleSendPromptModification = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chatInput.trim() || !builtCode || modifyingCode) return;
+  // AI Canlı Kod Düzenleme (Chat Refine) — directText parametresi v1 chip'leri için otomatik gönderimde kullanılır
+  const handleSendPromptModification = async (e?: React.FormEvent, directText?: string) => {
+    if (e) e.preventDefault();
+    const userText = (directText || chatInput).trim();
+    if (!userText || !builtCode || modifyingCode) return;
 
-    const userText = chatInput.trim();
     setChatInput('');
     const userMsg: ChatMessage = {
       sender: 'user',
@@ -399,10 +399,26 @@ export default function App() {
       checkQuotaExceeded(data, res.status);
       if (!res.ok) throw new Error(data.error || 'Kod güncellenemedi');
 
+      // Kota aşımı veya API key eksikliğinde dürüst bilgilendirme
+      if (data.isQuotaExceeded) {
+        const quotaMsg: ChatMessage = {
+          sender: 'ai',
+          text: `⚠️ Şu anda AI motoru kullanılamıyor (API anahtarı eksik veya kota doldu). Değişiklik yapabilmem için lütfen Hesap & API Ayarları bölümünden ücretsiz bir Groq API anahtarı girin.`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+        setChatMessages(prev => [...prev, quotaMsg]);
+        return;
+      }
+
+      // Kodun gerçekten değişip değişmediğini kontrol et
+      const codeActuallyChanged = data.updatedCode !== builtCode;
       setBuiltCode(data.updatedCode);
+
       const aiMsg: ChatMessage = {
         sender: 'ai',
-        text: `İsteğin doğrultusunda kodu güncelledim ve canlı uygulamaya yansıttım! 🚀`,
+        text: codeActuallyChanged
+          ? `İsteğin doğrultusunda kodu güncelledim ve canlı uygulamaya yansıttım! 🚀`
+          : `İsteğini inceledim ancak mevcut kod üzerinde anlamlı bir değişiklik yapılamadı. Lütfen daha spesifik bir istek deneyin (örn: "Başlığı kırmızı yap", "Yeni bir buton ekle").`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
       setChatMessages(prev => [...prev, aiMsg]);
@@ -1386,9 +1402,10 @@ export default function App() {
                                 <button
                                   key={idx}
                                   type="button"
-                                  onClick={() => setChatInput('v1 sınırında bıraktığımız şu özelliği uygulamaya ekle: ' + item)}
-                                  className="text-[10px] px-2.5 py-1 bg-white border border-neutral-200 text-neutral-700 rounded-lg hover:bg-neutral-50 hover:border-neutral-300 transition-colors text-left truncate max-w-full cursor-pointer shadow-2xs font-medium flex items-center gap-1"
-                                  title={'İsteme ekle: ' + item}
+                                  onClick={() => handleSendPromptModification(undefined, 'v1 sınırında bıraktığımız şu özelliği uygulamaya ekle: ' + item)}
+                                  disabled={modifyingCode}
+                                  className="text-[10px] px-2.5 py-1 bg-white border border-neutral-200 text-neutral-700 rounded-lg hover:bg-neutral-50 hover:border-neutral-300 transition-colors text-left truncate max-w-full cursor-pointer shadow-2xs font-medium flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                                  title={'Tıkla ve otomatik uygula: ' + item}
                                 >
                                   <span className="text-indigo-600 font-bold">+</span>
                                   <span>{item}</span>
