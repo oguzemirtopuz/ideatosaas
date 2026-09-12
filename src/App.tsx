@@ -5,7 +5,8 @@ import {
   CheckCircle2, AlertTriangle, FileText, ArrowRight, ArrowLeft, 
   Layers, Hammer, Eye, Play, Sparkles, Check, Download, ExternalLink,
   TrendingUp, BarChart3, Users, Archive, Send, MessageSquare, 
-  UserCheck, History, Trash2, FolderGit2, RefreshCw, Key, Settings, Copy
+  UserCheck, History, Trash2, FolderGit2, RefreshCw, Key, Settings, Copy,
+  Sun, Moon
 } from 'lucide-react';
 
 interface IdeaScore {
@@ -89,6 +90,28 @@ export default function App() {
   });
   const [inputApiKey, setInputApiKey] = useState<string>('');
   const [quotaWarning, setQuotaWarning] = useState<string | null>(null);
+
+  // Tema Yönetimi (Açık / Koyu Mod)
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    try {
+      const saved = localStorage.getItem('saas_theme');
+      if (saved === 'dark' || saved === 'light') return saved;
+      return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    } catch {
+      return 'light';
+    }
+  });
+
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    try {
+      localStorage.setItem('saas_theme', theme);
+    } catch {}
+  }, [theme]);
 
   // Proje Geçmişi
   const [savedProjects, setSavedProjects] = useState<SavedProject[]>(() => {
@@ -1920,6 +1943,47 @@ export default function App() {
             </div>
           </div>
         )}
+
+        {/* Sol Altta Sabit Dark / Light Mod Değiştirici (Floating Theme Toggle) */}
+        <div className="fixed bottom-5 left-5 z-50 select-none">
+          <div className={`flex flex-col items-center gap-1.5 px-3.5 py-2 rounded-2xl shadow-xl backdrop-blur-md border transition-all duration-300 ${
+            theme === 'dark'
+              ? 'bg-[#181824]/90 border-neutral-700/80 text-neutral-300 shadow-black/50'
+              : 'bg-white/95 border-neutral-200/90 text-neutral-600 shadow-neutral-300/50'
+          }`}>
+            <div className="flex items-center gap-2.5">
+              <Sun className={`w-4 h-4 transition-all duration-300 ${
+                theme === 'light' ? 'text-amber-500 scale-110' : 'text-neutral-500 opacity-60'
+              }`} />
+              
+              {/* Switch Track */}
+              <button
+                type="button"
+                role="switch"
+                aria-checked={theme === 'dark'}
+                onClick={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}
+                className={`w-12 h-6 flex items-center rounded-full p-0.5 cursor-pointer transition-colors duration-300 focus:outline-none ${
+                  theme === 'dark' ? 'bg-indigo-600' : 'bg-neutral-300'
+                }`}
+                title={theme === 'dark' ? "Açık Moda Geç (Light Mode)" : "Koyu Moda Geç (Dark Mode)"}
+              >
+                <div
+                  className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-300 ease-in-out ${
+                    theme === 'dark' ? 'translate-x-6' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+
+              <Moon className={`w-4 h-4 transition-all duration-300 ${
+                theme === 'dark' ? 'text-indigo-400 scale-110' : 'text-neutral-500 opacity-60'
+              }`} />
+            </div>
+
+            <span className="text-[9px] font-bold tracking-wider uppercase opacity-75">
+              AÇIK | KOYU
+            </span>
+          </div>
+        </div>
 
       </div>
     </div>
