@@ -411,14 +411,65 @@ export default function App() {
       }
 
       // Kodun gerçekten değişip değişmediğini kontrol et
-      const codeActuallyChanged = data.updatedCode !== builtCode;
-      setBuiltCode(data.updatedCode);
+      const newCode = data.updatedCode;
+      const codeActuallyChanged = newCode !== builtCode;
+
+      if (!codeActuallyChanged) {
+        const aiMsg: ChatMessage = {
+          sender: 'ai',
+          text: `İsteğini inceledim ancak mevcut kod üzerinde anlamlı bir değişiklik yapılamadı. Lütfen daha spesifik bir istek deneyin (örn: "Başlığı kırmızı yap", "Yeni bir buton ekle").`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+        setChatMessages(prev => [...prev, aiMsg]);
+        return;
+      }
+
+      // 🛡️ GÜVENLİK AĞI: Yeni kodu uygulamadan önce Babel ile derlemeyi dene
+      // Eğer bozuk JSX/syntax varsa eski kodu koru ve kullanıcıyı bilgilendir
+      let codeIsValid = true;
+      let validationError = '';
+      try {
+        const sanitized = sanitizeReactCode(newCode);
+        // @ts-ignore — Babel global olarak yüklenmeyebilir, o durumda basit kontrol yap
+        if (typeof (window as any).Babel !== 'undefined') {
+          (window as any).Babel.transform(sanitized, {
+            presets: ['react'],
+            filename: 'validate.tsx'
+          });
+        } else {
+          // Babel yoksa basit syntax kontrolleri
+          const openBraces = (sanitized.match(/\{/g) || []).length;
+          const closeBraces = (sanitized.match(/\}/g) || []).length;
+          const openParens = (sanitized.match(/\(/g) || []).length;
+          const closeParens = (sanitized.match(/\)/g) || []).length;
+          if (Math.abs(openBraces - closeBraces) > 3 || Math.abs(openParens - closeParens) > 3) {
+            codeIsValid = false;
+            validationError = 'Parantez veya süslü parantez dengesizliği tespit edildi.';
+          }
+        }
+      } catch (babelErr: any) {
+        codeIsValid = false;
+        validationError = babelErr?.message || 'Bilinmeyen sözdizimi hatası';
+      }
+
+      if (!codeIsValid) {
+        // Eski kodu koru, kullanıcıya bozuk kodu uygulamadığımızı bildir
+        const errorMsg: ChatMessage = {
+          sender: 'ai',
+          text: `⚠️ AI'ın ürettiği yeni kodda sözdizimi hatası tespit edildi, uygulamanızı korumak için eski kod korundu.\n\n🔍 Hata: ${validationError}\n\n💡 Lütfen daha spesifik bir istek deneyin (örn: "Rengi mavi yap", "Yeni tablo ekle").`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+        setChatMessages(prev => [...prev, errorMsg]);
+        return;
+      }
+
+      // Kod geçerli — güvenle uygula
+      setBuiltCode(newCode);
+      setPreviewKey(prev => prev + 1);
 
       const aiMsg: ChatMessage = {
         sender: 'ai',
-        text: codeActuallyChanged
-          ? `İsteğin doğrultusunda kodu güncelledim ve canlı uygulamaya yansıttım! 🚀`
-          : `İsteğini inceledim ancak mevcut kod üzerinde anlamlı bir değişiklik yapılamadı. Lütfen daha spesifik bir istek deneyin (örn: "Başlığı kırmızı yap", "Yeni bir buton ekle").`,
+        text: `İsteğin doğrultusunda kodu güncelledim ve canlı uygulamaya yansıttım! 🚀`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
       setChatMessages(prev => [...prev, aiMsg]);
