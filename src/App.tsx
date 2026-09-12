@@ -5,7 +5,7 @@ import {
   CheckCircle2, AlertTriangle, FileText, ArrowRight, ArrowLeft, 
   Layers, Hammer, Eye, Play, Sparkles, Check, Download, ExternalLink,
   TrendingUp, BarChart3, Users, Archive, Send, MessageSquare, 
-  UserCheck, History, Trash2, FolderGit2, RefreshCw, Key, Settings
+  UserCheck, History, Trash2, FolderGit2, RefreshCw, Key, Settings, Copy
 } from 'lucide-react';
 
 interface IdeaScore {
@@ -521,6 +521,16 @@ export default function App() {
     const filtered = savedProjects.filter(p => p.id !== id);
     setSavedProjects(filtered);
     localStorage.setItem('saas_builder_projects', JSON.stringify(filtered));
+  };
+
+  // Tüm kayıtlı projelerin başlık ve açıklamalarını panoya kopyalama
+  const copyAllProjectsSummary = () => {
+    if (savedProjects.length === 0) return;
+    const text = savedProjects.map((p, i) => 
+      `${i + 1}. ${p.idea.title} (Puan: ${p.idea.totalScore}/40)\nProblem: ${p.idea.problem}\nHedef Kitle: ${p.idea.targetUser || 'Belirtilmemiş'}\nKayıt Tarihi: ${p.createdAt}`
+    ).join('\n\n---\n\n');
+    navigator.clipboard.writeText(text);
+    alert(`${savedProjects.length} adet projenin başlıkları ve açıklamaları panoya kopyalandı!`);
   };
 
   // React kodunu temizleme ve import/export kalıntılarını arındırma fonksiyonu
@@ -1838,12 +1848,24 @@ export default function App() {
                   <h3 className="text-lg font-bold text-neutral-900">Kayıtlı Projeler & Geçmiş</h3>
                   <p className="text-xs text-neutral-500">Önceki ürettiğiniz uygulamalar, AI sohbetleri ve ZIP exportları.</p>
                 </div>
-                <button
-                  onClick={() => setShowHistoryModal(false)}
-                  className="text-neutral-400 hover:text-neutral-900 text-sm font-bold p-1"
-                >
-                  ✕
-                </button>
+                <div className="flex items-center gap-2">
+                  {savedProjects.length > 0 && (
+                    <button
+                      onClick={copyAllProjectsSummary}
+                      className="px-2.5 py-1 bg-neutral-900 text-white rounded-lg text-xs font-semibold hover:bg-neutral-800 transition-colors flex items-center gap-1.5 shadow-xs"
+                      title="Tüm projelerin başlık ve açıklamalarını kopyala"
+                    >
+                      <Copy className="w-3 h-3" />
+                      <span>Tümünü Metin Olarak Kopyala</span>
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setShowHistoryModal(false)}
+                    className="text-neutral-400 hover:text-neutral-900 text-sm font-bold p-1 ml-1"
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
 
               <div className="flex-1 overflow-y-auto space-y-3">
