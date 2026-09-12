@@ -130,7 +130,7 @@ export default function App() {
 
   // Sekme Başlığı ve Favicon Zorlama (Önbellek aşımı)
   useEffect(() => {
-    document.title = 'ideatosaas';
+    document.title = 'Idea to Saas';
     let link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
     if (!link) {
       link = document.createElement('link');
