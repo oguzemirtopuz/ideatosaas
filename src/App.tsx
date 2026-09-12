@@ -5,7 +5,7 @@ import {
   CheckCircle2, AlertTriangle, FileText, ArrowRight, ArrowLeft, 
   Layers, Hammer, Eye, Play, Sparkles, Check, Download, ExternalLink,
   TrendingUp, BarChart3, Users, Archive, Send, MessageSquare, 
-  UserCheck, History, Trash2, FolderGit2, RefreshCw
+  UserCheck, History, Trash2, FolderGit2, RefreshCw, Key, Settings
 } from 'lucide-react';
 
 interface IdeaScore {
@@ -83,6 +83,13 @@ export default function App() {
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
   const [inputEmail, setInputEmail] = useState<string>('');
 
+  // Özel Groq API Anahtarı ve Kota Uyarısı
+  const [customApiKey, setCustomApiKey] = useState<string>(() => {
+    return localStorage.getItem('user_custom_groq_api_key') || '';
+  });
+  const [inputApiKey, setInputApiKey] = useState<string>('');
+  const [quotaWarning, setQuotaWarning] = useState<string | null>(null);
+
   // Proje Geçmişi
   const [savedProjects, setSavedProjects] = useState<SavedProject[]>(() => {
     try {
@@ -153,18 +160,48 @@ export default function App() {
     }
   }, [builtCode, chatMessages]);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const getApiHeaders = () => {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (customApiKey.trim()) {
+      headers['x-groq-api-key'] = customApiKey.trim();
+    }
+    return headers;
+  };
+
+  const checkQuotaExceeded = (data: any, status?: number) => {
+    if (status === 429 || data?.isQuotaExceeded) {
+      setQuotaWarning(
+        "AI quota or rate limit reached. The system is operating with backup templates. You can provide your own free Groq API key in Account Settings for unlimited access."
+      );
+    }
+  };
+
+  const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
     if (inputEmail.trim()) {
       localStorage.setItem('saas_builder_user', inputEmail.trim());
       setUserEmail(inputEmail.trim());
-      setShowAuthModal(false);
     }
+    const trimmedKey = inputApiKey.trim();
+    if (trimmedKey) {
+      localStorage.setItem('user_custom_groq_api_key', trimmedKey);
+      setCustomApiKey(trimmedKey);
+      setQuotaWarning(null);
+    } else {
+      localStorage.removeItem('user_custom_groq_api_key');
+      setCustomApiKey('');
+    }
+    setShowAuthModal(false);
   };
 
   const handleLogout = () => {
     localStorage.removeItem('saas_builder_user');
+    localStorage.removeItem('user_custom_groq_api_key');
     setUserEmail('');
+    setCustomApiKey('');
+    setInputApiKey('');
   };
 
   const generateIdeas = async () => {
@@ -183,10 +220,11 @@ export default function App() {
       const body = customIdea.trim() ? { customIdea: customIdea.trim() } : undefined;
       const response = await fetch('/api/generate-ideas', { 
         method: 'POST',
-        headers: body ? { 'Content-Type': 'application/json' } : undefined,
+        headers: getApiHeaders(),
         body: body ? JSON.stringify(body) : undefined
       });
       const data = await response.json();
+      checkQuotaExceeded(data, response.status);
       
       if (!response.ok) {
         throw new Error(data.error || 'Fikirler üretilemedi');
@@ -220,10 +258,11 @@ export default function App() {
     try {
       const res = await fetch('/api/generate-spec', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getApiHeaders(),
         body: JSON.stringify({ idea })
       });
       const data = await res.json();
+      checkQuotaExceeded(data, res.status);
       if (!res.ok) throw new Error(data.error || 'Spec üretilemedi');
       setSpec(data.spec);
     } catch (e: any) {
@@ -242,10 +281,11 @@ export default function App() {
     try {
       const res = await fetch('/api/build-app', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getApiHeaders(),
         body: JSON.stringify({ idea: selectedIdea, spec })
       });
       const data = await res.json();
+      checkQuotaExceeded(data, res.status);
       if (!res.ok) throw new Error(data.error || 'Uygulama kodu üretilemedi');
       setBuiltCode(data.code);
       setActiveTab('preview');
@@ -282,7 +322,7 @@ export default function App() {
     try {
       const res = await fetch('/api/modify-app', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getApiHeaders(),
         body: JSON.stringify({
           currentCode: builtCode,
           userPrompt: userText,
@@ -290,6 +330,7 @@ export default function App() {
         })
       });
       const data = await res.json();
+      checkQuotaExceeded(data, res.status);
       if (!res.ok) throw new Error(data.error || 'Kod güncellenemedi');
 
       setBuiltCode(data.updatedCode);
@@ -320,10 +361,11 @@ export default function App() {
     try {
       const res = await fetch('/api/generate-marketing-decision', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getApiHeaders(),
         body: JSON.stringify({ idea: selectedIdea, spec })
       });
       const data = await res.json();
+      checkQuotaExceeded(data, res.status);
       if (!res.ok) throw new Error(data.error || 'Pazarlama testi üretilemedi');
       setMarketingData(data.result);
       setActiveTab('marketing');
@@ -332,6 +374,41 @@ export default function App() {
     } finally {
       setMarketingLoading(false);
     }
+  };
+
+  // Dosyayı kullanıcının seçeceği konuma kaydetme (veya desteklenmeyen tarayıcılarda klasik indirme)
+  const saveBlobWithPicker = async (blob: Blob, defaultFilename: string, mimeType: string, extension: string) => {
+    if ('showSaveFilePicker' in window) {
+      try {
+        const handle = await (window as any).showSaveFilePicker({
+          suggestedName: defaultFilename,
+          types: [
+            {
+              description: `${extension.toUpperCase().replace('.', '')} Dosyası`,
+              accept: { [mimeType]: [extension] },
+            },
+          ],
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return;
+      } catch (err: any) {
+        if (err.name === 'AbortError') {
+          // Kullanıcı indirmeyi iptal etti
+          return;
+        }
+        console.warn('showSaveFilePicker başarısız, klasik indirmeye geçiliyor:', err);
+      }
+    }
+
+    // Klasik indirme (File System Access API desteklenmeyen tarayıcılar için yedek)
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = defaultFilename;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   // Aşama 3: Tek Tıkla Tam ZIP Paketi İndirme
@@ -352,27 +429,18 @@ export default function App() {
       zip.file("README.md", readme);
 
       const content = await zip.generateAsync({ type: "blob" });
-      const url = URL.createObjectURL(content);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${slug}-proje-paketi.zip`;
-      a.click();
-      URL.revokeObjectURL(url);
+      await saveBlobWithPicker(content, `${slug}-proje-paketi.zip`, 'application/zip', '.zip');
     } catch (err: any) {
       alert("ZIP oluşturulurken hata: " + err.message);
     }
   };
 
-  const downloadStandaloneProject = () => {
+  const downloadStandaloneProject = async () => {
     if (!builtCode || !selectedIdea) return;
     const htmlContent = getPreviewHtml(builtCode);
     const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${selectedIdea.title.toLowerCase().replace(/[^a-z0-9]/g, '-')}-app.html`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const slug = selectedIdea.title.toLowerCase().replace(/[^a-z0-9]/g, '-');
+    await saveBlobWithPicker(blob, `${slug}-app.html`, 'text/html', '.html');
   };
 
   // Geçmiş projeyi geri yükleme
@@ -698,10 +766,33 @@ export default function App() {
                   return EB;
                 })();
 
+                // React hook'larını window seviyesinde hazırla
+                window.useState = React.useState;
+                window.useEffect = React.useEffect;
+                window.useMemo = React.useMemo;
+                window.useRef = React.useRef;
+                window.useCallback = React.useCallback;
+                window.useContext = React.useContext;
+                window.useReducer = React.useReducer;
+                window.useId = React.useId;
+
+                // Kod içindeki mükerrer const { useState } = React bildirimlerini temizle
+                rawCode = rawCode.replace(/(?:const|let|var)\s*\{[^}]*\}\s*=\s*React;?/g, '/* React hooks global */');
+
+                // Kod içindeki tüm potansiyel PascalCase ikon veya alt bileşenleri yakala ve güvenli ata
+                var detectedIcons = Array.from(new Set(rawCode.match(/<([A-Z][a-zA-Z0-9_]*)/g) || []))
+                  .map(function(t) { return t.slice(1); })
+                  .filter(function(t) { return !['App', 'Main', 'React', 'Fragment', 'ErrorBoundary'].includes(t); });
+
+                var iconDeclarations = detectedIcons.map(function(name) {
+                  return "if (typeof " + name + " === 'undefined') { var " + name + " = window.LucideIcons['" + name + "']; }";
+                }).join(String.fromCharCode(10));
+
                 window.__CurrentApp = null;
 
                 var codeToTransform = [
-                  "const { useState, useEffect, useMemo, useRef, useCallback } = React;",
+                  "var useState = React.useState, useEffect = React.useEffect, useMemo = React.useMemo, useRef = React.useRef, useCallback = React.useCallback;",
+                  iconDeclarations,
                   rawCode,
                   "var _candidate = null;",
                   "if (typeof App !== 'undefined') { _candidate = App; }",
@@ -714,7 +805,10 @@ export default function App() {
 
                 var transformed = window.Babel.transform(
                   codeToTransform,
-                  { presets: [['react', { runtime: 'classic' }]] }
+                  { 
+                    filename: 'app.tsx',
+                    presets: ['typescript', ['react', { runtime: 'classic' }]] 
+                  }
                 ).code;
 
                 // Ekstra güvenlik: derlenmiş kodda kalmış tüm import ifadelerini temizle
@@ -777,11 +871,27 @@ export default function App() {
               Kayıtlı Projeler ({savedProjects.length})
             </button>
 
-            {/* Kullanıcı Giriş / Hesap */}
+            {/* Kullanıcı Giriş / Hesap ve Ayarlar */}
             {userEmail ? (
               <div className="flex items-center gap-2 bg-white border border-neutral-200 px-3 py-1.5 rounded-lg shadow-sm text-xs">
                 <span className="w-2 h-2 rounded-full bg-green-500"></span>
                 <span className="font-semibold text-neutral-800">{userEmail}</span>
+                {customApiKey ? (
+                  <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 text-[10px] font-semibold rounded border border-indigo-200 flex items-center gap-1" title="Özel Groq API Anahtarı Aktif">
+                    <Key className="w-2.5 h-2.5" /> Key
+                  </span>
+                ) : null}
+                <button
+                  onClick={() => {
+                    setInputEmail(userEmail);
+                    setInputApiKey(customApiKey);
+                    setShowAuthModal(true);
+                  }}
+                  className="text-neutral-500 hover:text-neutral-900 ml-1 p-0.5 rounded"
+                  title="Hesap & API Ayarları"
+                >
+                  <Settings className="w-3.5 h-3.5" />
+                </button>
                 <button
                   onClick={handleLogout}
                   className="text-neutral-400 hover:text-red-600 ml-1 text-[11px]"
@@ -792,15 +902,48 @@ export default function App() {
               </div>
             ) : (
               <button
-                onClick={() => setShowAuthModal(true)}
+                onClick={() => {
+                  setInputEmail(userEmail);
+                  setInputApiKey(customApiKey);
+                  setShowAuthModal(true);
+                }}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-neutral-900 text-white rounded-lg text-xs font-semibold hover:bg-neutral-800 transition-colors shadow-sm"
               >
                 <UserCheck className="w-3.5 h-3.5" />
-                Hesap Oluştur / Giriş
+                Hesap & API Ayarları
               </button>
             )}
           </div>
         </div>
+
+        {/* İngilizce Kota ve Rate Limit Uyarısı */}
+        {quotaWarning && (
+          <div className="bg-amber-50 border border-amber-300 text-amber-900 px-4 py-3 rounded-xl mb-6 flex items-center justify-between shadow-xs">
+            <div className="flex items-center gap-2.5 text-xs font-medium">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>{quotaWarning}</span>
+            </div>
+            <div className="flex items-center gap-2 ml-4 shrink-0">
+              <button 
+                onClick={() => {
+                  setInputEmail(userEmail);
+                  setInputApiKey(customApiKey);
+                  setShowAuthModal(true);
+                }}
+                className="px-2.5 py-1 bg-amber-200 hover:bg-amber-300 text-amber-900 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1"
+              >
+                <Key className="w-3 h-3" /> Account Settings
+              </button>
+              <button 
+                onClick={() => setQuotaWarning(null)}
+                className="text-amber-600 hover:text-amber-900 text-xs px-1 font-bold"
+                title="Dismiss"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Hata Bildirimi */}
         {error && (
@@ -1463,24 +1606,65 @@ export default function App() {
           </div>
         )}
 
-        {/* MODAL 1: HESAP OLUŞTURMA / GİRİŞ */}
+        {/* MODAL 1: HESAP & API AYARLARI */}
         {showAuthModal && (
           <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-neutral-200">
-              <h3 className="text-lg font-bold text-neutral-900 mb-1">Hesap / Profil</h3>
+              <div className="flex items-center justify-between mb-1">
+                <h3 className="text-lg font-bold text-neutral-900">Hesap & API Ayarları</h3>
+                <button
+                  onClick={() => setShowAuthModal(false)}
+                  className="text-neutral-400 hover:text-neutral-900 text-xs p-1"
+                >
+                  ✕
+                </button>
+              </div>
               <p className="text-xs text-neutral-500 mb-4">
-                Projeleriniz ve AI sohbet geçmişiniz bu e-posta profiline otomatik kaydedilir.
+                Projeleriniz ve geçmişiniz e-posta profilinize kaydedilir.
               </p>
-              <form onSubmit={handleLogin} className="space-y-3">
-                <input
-                  type="email"
-                  value={inputEmail}
-                  onChange={(e) => setInputEmail(e.target.value)}
-                  placeholder="eposta@ornek.com"
-                  required
-                  className="w-full px-3.5 py-2.5 border border-neutral-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-neutral-900"
-                />
-                <div className="flex items-center gap-2 pt-1">
+              <form onSubmit={handleSaveSettings} className="space-y-4">
+                <div>
+                  <label className="block text-[11px] font-semibold text-neutral-700 mb-1">
+                    E-posta Profili
+                  </label>
+                  <input
+                    type="email"
+                    value={inputEmail}
+                    onChange={(e) => setInputEmail(e.target.value)}
+                    placeholder="eposta@ornek.com"
+                    required
+                    className="w-full px-3.5 py-2.5 border border-neutral-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-neutral-900"
+                  />
+                </div>
+
+                <div className="space-y-1.5 pt-1 border-t border-neutral-100">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-semibold text-neutral-700 flex items-center gap-1">
+                      <Key className="w-3 h-3 text-indigo-600" />
+                      Özel Groq API Anahtarı
+                    </label>
+                    <a 
+                      href="https://console.groq.com/keys" 
+                      target="_blank" 
+                      rel="noreferrer" 
+                      className="text-[10px] text-indigo-600 hover:underline inline-flex items-center gap-0.5"
+                    >
+                      Ücretsiz Al <ExternalLink className="w-2.5 h-2.5" />
+                    </a>
+                  </div>
+                  <input
+                    type="password"
+                    value={inputApiKey}
+                    onChange={(e) => setInputApiKey(e.target.value)}
+                    placeholder={customApiKey ? "••••••••••••••••" : "gsk_..."}
+                    className="w-full px-3.5 py-2.5 border border-neutral-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-neutral-900 font-mono"
+                  />
+                  <p className="text-[10.5px] text-neutral-400 leading-normal">
+                    İsteğe bağlıdır. Boş bırakırsanız sistemin varsayılan ücretsiz kotası kullanılır. Kendi ücretsiz anahtarınızı girerek kesintisiz ve yüksek limitli üretim yapabilirsiniz.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 pt-2">
                   <button
                     type="button"
                     onClick={() => setShowAuthModal(false)}
@@ -1492,7 +1676,7 @@ export default function App() {
                     type="submit"
                     className="flex-1 py-2 bg-neutral-900 text-white rounded-xl text-xs font-semibold hover:bg-neutral-800"
                   >
-                    Kaydet & Giriş
+                    Ayarları Kaydet
                   </button>
                 </div>
               </form>

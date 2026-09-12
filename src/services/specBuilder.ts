@@ -10,7 +10,7 @@ export async function generateSpecHandler(req: Request, res: Response) {
       return;
     }
 
-    const apiKey = process.env.GROQ_API_KEY;
+    const apiKey = (req.headers['x-groq-api-key'] as string) || req.body?.customApiKey || process.env.GROQ_API_KEY;
     if (!apiKey) {
       console.warn("GROQ_API_KEY bulunamadı, akıllı yedek şartname (spec) oluşturuluyor.");
       const fallbackSpec = {
@@ -42,7 +42,7 @@ export async function generateSpecHandler(req: Request, res: Response) {
           "Adım 4: Veri Dışa Aktarma ve Doğrulama"
         ]
       };
-      res.json({ spec: fallbackSpec });
+      res.json({ spec: fallbackSpec, isQuotaExceeded: true });
       return;
     }
 
@@ -110,6 +110,7 @@ Aşağıdaki JSON formatında yanıt ver (Markdown veya ek metin kullanma):
 }`;
 
     let parsedSpec = null;
+    let lastError: any = null;
     for (const modelName of priorityModels) {
       try {
         const response = await groq.chat.completions.create({
@@ -130,8 +131,8 @@ Aşağıdaki JSON formatında yanıt ver (Markdown veya ek metin kullanma):
             break;
           }
         }
-      } catch (err) {
-        // sonraki modeli dene
+      } catch (err: any) {
+        lastError = err;
       }
     }
 
@@ -168,7 +169,11 @@ Aşağıdaki JSON formatında yanıt ver (Markdown veya ek metin kullanma):
       };
     }
 
-    res.json({ spec: parsedSpec });
+    const isQuotaError = lastError?.status === 429 || 
+      lastError?.message?.toLowerCase().includes('rate limit') || 
+      lastError?.message?.toLowerCase().includes('quota');
+
+    res.json({ spec: parsedSpec, isQuotaExceeded: !!isQuotaError });
   } catch (error: any) {
     console.error("Spec generation error:", error);
     res.status(500).json({ error: error.message || "Spec oluşturulamadı" });
@@ -312,7 +317,7 @@ export async function buildAppHandler(req: Request, res: Response) {
       return;
     }
 
-    const apiKey = process.env.GROQ_API_KEY;
+    const apiKey = (req.headers['x-groq-api-key'] as string) || req.body?.customApiKey || process.env.GROQ_API_KEY;
     if (!apiKey) {
       console.warn("GROQ_API_KEY bulunamadı, garantili çalışan starter bileşen üretiliyor.");
       const starterCode = `function App() {
@@ -371,7 +376,7 @@ export async function buildAppHandler(req: Request, res: Response) {
     </div>
   );
 }`;
-      res.json({ code: starterCode });
+      res.json({ code: starterCode, isQuotaExceeded: true });
       return;
     }
 
@@ -411,6 +416,7 @@ KESİN KURALLAR:
 6. Okunabilir, satır satır ve temiz girintili JSX yaz (minified tek satır yazma). Tailwind CSS sınıflarını kullan.`;
 
     let response = null;
+    let lastError: any = null;
     for (const modelName of priorityModels) {
       try {
         response = await groq.chat.completions.create({
@@ -435,6 +441,7 @@ KESİN KURALLAR:
           }
         }
       } catch (err: any) {
+        lastError = err;
         console.error(`Groq build error with ${modelName}:`, err?.message || err);
       }
     }
@@ -509,7 +516,12 @@ KESİN KURALLAR:
 
     // Kodun başındaki gereksiz açıklamaları at ve sanitize et
     const sanitized = sanitizeReactCode(rawCode);
-    res.json({ code: sanitized });
+    const isQuotaError = (!response || !response.choices?.[0]?.message?.content) && (
+      lastError?.status === 429 || 
+      lastError?.message?.toLowerCase().includes('rate limit') || 
+      lastError?.message?.toLowerCase().includes('quota')
+    );
+    res.json({ code: sanitized, isQuotaExceeded: !!isQuotaError });
   } catch (error: any) {
     console.error("App build error:", error);
     res.status(500).json({ error: error.message || "Uygulama inşası başarısız oldu" });
@@ -525,10 +537,10 @@ export async function modifyAppWithPromptHandler(req: Request, res: Response) {
       return;
     }
 
-    const apiKey = process.env.GROQ_API_KEY;
+    const apiKey = (req.headers['x-groq-api-key'] as string) || req.body?.customApiKey || process.env.GROQ_API_KEY;
     if (!apiKey) {
       console.warn("GROQ_API_KEY bulunamadı, mevcut kod korunarak yanıt veriliyor.");
-      res.json({ updatedCode: sanitizeReactCode(currentCode) });
+      res.json({ updatedCode: sanitizeReactCode(currentCode), isQuotaExceeded: true });
       return;
     }
 
@@ -570,6 +582,7 @@ KESİN KURALLAR:
 6. Tailwind CSS sınıflarını kullan.`;
 
     let response = null;
+    let lastError: any = null;
     for (const modelName of priorityModels) {
       try {
         response = await groq.chat.completions.create({
@@ -591,11 +604,23 @@ KESİN KURALLAR:
           }
         }
       } catch (err: any) {
+        lastError = err;
         console.error(`Groq modify error with ${modelName}:`, err?.message || err);
       }
     }
 
+    const isQuotaError = lastError?.status === 429 || 
+      lastError?.message?.toLowerCase().includes('rate limit') || 
+      lastError?.message?.toLowerCase().includes('quota');
+
     if (!response || !response.choices?.[0]?.message?.content) {
+      if (isQuotaError) {
+        res.status(429).json({ 
+          error: "AI rate limit or quota exceeded. Please provide your own free Groq API key in Settings.", 
+          isQuotaExceeded: true 
+        });
+        return;
+      }
       throw new Error("Kod güncellenemedi.");
     }
 

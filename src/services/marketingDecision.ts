@@ -10,7 +10,7 @@ export async function generateMarketingAndDecisionHandler(req: Request, res: Res
       return;
     }
 
-    const apiKey = process.env.GROQ_API_KEY;
+    const apiKey = (req.headers['x-groq-api-key'] as string) || req.body?.customApiKey || process.env.GROQ_API_KEY;
     if (!apiKey) {
       console.warn("GROQ_API_KEY bulunamadı, akıllı yedek pazarlama stratejisi üretiliyor.");
       const fallbackResult = {
@@ -34,7 +34,7 @@ export async function generateMarketingAndDecisionHandler(req: Request, res: Res
           decisionNote: "CAC $0.93 ile $0.50 - $1.00 hedef aralığında! Büyümeyi sürdürün."
         }
       };
-      res.json({ result: fallbackResult });
+      res.json({ result: fallbackResult, isQuotaExceeded: true });
       return;
     }
 
@@ -98,6 +98,7 @@ KESİNLİKLE AŞAĞIDAKİ JSON FORMATINDA DÖN (Markdown veya açıklama ekleme)
 }`;
 
     let parsedResult = null;
+    let lastError: any = null;
     for (const modelName of priorityModels) {
       try {
         const response = await groq.chat.completions.create({
@@ -118,8 +119,8 @@ KESİNLİKLE AŞAĞIDAKİ JSON FORMATINDA DÖN (Markdown veya açıklama ekleme)
             break;
           }
         }
-      } catch (err) {
-        // sonraki modeli dene
+      } catch (err: any) {
+        lastError = err;
       }
     }
 
@@ -148,7 +149,13 @@ KESİNLİKLE AŞAĞIDAKİ JSON FORMATINDA DÖN (Markdown veya açıklama ekleme)
       };
     }
 
-    res.json({ result: parsedResult });
+    const isQuotaError = !parsedResult && (
+      lastError?.status === 429 || 
+      lastError?.message?.toLowerCase().includes('rate limit') || 
+      lastError?.message?.toLowerCase().includes('quota')
+    );
+
+    res.json({ result: parsedResult, isQuotaExceeded: !!isQuotaError });
   } catch (error: any) {
     console.error("Marketing & Decision error:", error);
     res.status(500).json({ error: error.message || "Pazarlama analizi başarısız oldu" });

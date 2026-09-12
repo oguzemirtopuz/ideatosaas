@@ -3,6 +3,7 @@
 
 import assert from 'assert';
 import http from 'http';
+import JSZip from 'jszip';
 import { sanitizeReactCode } from '../src/services/specBuilder.ts';
 import app from '../src/app.ts';
 
@@ -216,38 +217,313 @@ async function testApiEndpoints() {
       });
     });
 
+    // Test 2.7: /api/generate-spec Eksik Parametre Doğrulaması (400)
+    await new Promise((resolve) => {
+      runTest('API: POST /api/generate-spec (Eksik parametrede 400 hatası)', async () => {
+        const res = await fetch(`${baseUrl}/api/generate-spec`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        });
+        assert.strictEqual(res.status, 400);
+        resolve();
+      });
+    });
+
+    // Test 2.8: /api/build-app Eksik Parametre Doğrulaması (400)
+    await new Promise((resolve) => {
+      runTest('API: POST /api/build-app (Eksik parametrede 400 hatası)', async () => {
+        const res = await fetch(`${baseUrl}/api/build-app`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ idea: { title: 'Test' } }) // spec eksik
+        });
+        assert.strictEqual(res.status, 400);
+        resolve();
+      });
+    });
+
+    // Test 2.9: /api/modify-app Eksik Parametre Doğrulaması (400)
+    await new Promise((resolve) => {
+      runTest('API: POST /api/modify-app (Eksik parametrede 400 hatası)', async () => {
+        const res = await fetch(`${baseUrl}/api/modify-app`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ currentCode: 'function App() {}' }) // userPrompt eksik
+        });
+        assert.strictEqual(res.status, 400);
+        resolve();
+      });
+    });
+
+    // Test 2.10: /api/generate-marketing-decision Eksik Parametre (400)
+    await new Promise((resolve) => {
+      runTest('API: POST /api/generate-marketing-decision (Eksik parametrede 400 hatası)', async () => {
+        const res = await fetch(`${baseUrl}/api/generate-marketing-decision`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        });
+        assert.strictEqual(res.status, 400);
+        resolve();
+      });
+    });
+
+    // Test 2.11: x-groq-api-key başlığı desteği
+    await new Promise((resolve) => {
+      runTest('API: Özel x-groq-api-key başlığı ile istek alma', async () => {
+        const res = await fetch(`${baseUrl}/api/generate-ideas`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-groq-api-key': 'gsk_dummy_test_key_12345'
+          },
+          body: JSON.stringify({ customIdea: 'Mikro rezervasyon SaaS' })
+        });
+        const json = await res.json();
+        assert.strictEqual(res.status, 200);
+        assert.ok(json.ideas && json.ideas.length >= 1, 'Özel anahtar ile fikir üretimi veya fallback dönmeli');
+        resolve();
+      });
+    });
+
   } finally {
     server.close();
   }
 
   // -------------------------------------------------------------
-  // GRUP 3: BABEL STANDALONE VE CLASSIC RUNTIME GÜVENLİK TESTLERİ
+  // GRUP 3: CANLI UYGULAMA (SANDBOX) & BABEL DERLEME TESTLERİ
   // -------------------------------------------------------------
-  console.log('\n--- BÖLÜM 3: Babel Standalone Classic Runtime Testleri ---');
-  await new Promise((resolve) => {
-    runTest('Babel: Classic runtime konfigürasyonu import { jsx } sızıntısını engeller', async () => {
-      // Babel standalone fetch ve klasik runtime testi
-      const res = await fetch('https://unpkg.com/@babel/standalone/babel.min.js');
-      const babelJs = await res.text();
-      const vm = await import('vm');
-      const sandbox = { console };
-      sandbox.window = sandbox;
-      sandbox.global = sandbox;
-      vm.createContext(sandbox);
-      vm.runInContext(babelJs, sandbox);
+  console.log('\n--- BÖLÜM 3: Canlı Uygulama (Sandbox) & Babel Güvenlik Testleri ---');
+  
+  const res = await fetch('https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.9/babel.min.js');
+  const babelJs = await res.text();
+  const vm = await import('vm');
+  const sandbox = { console };
+  sandbox.window = sandbox;
+  sandbox.global = sandbox;
+  vm.createContext(sandbox);
+  vm.runInContext(babelJs, sandbox);
 
+  // Test 3.1: Classic runtime importsuz JSX
+  await new Promise((resolve) => {
+    runTest('Sandbox: Classic runtime konfigürasyonu import { jsx } sızıntısını engeller', () => {
       const testJsx = 'function App() { return <div className="bg-red-500"><span>Test</span></div>; }';
       const transformed = sandbox.Babel.transform(testJsx, {
-        presets: [['react', { runtime: 'classic' }]]
+        filename: 'app.tsx',
+        presets: ['typescript', ['react', { runtime: 'classic' }]]
       }).code;
 
       assert.strictEqual(/\bimport\b/.test(transformed), false, 'Classic runtime import içermemeli!');
       assert.ok(transformed.includes('React.createElement'), 'React.createElement çağrısı üretilmeli');
+      resolve();
+    });
+  });
 
-      // new Function ile çalıştırma kontrolü
-      const mockReact = { createElement: () => ({ type: 'div' }) };
-      const fn = new Function('React', transformed);
-      fn(mockReact);
+  // Test 3.2: TypeScript interface ve generics içeren kodun derlenmesi
+  await new Promise((resolve) => {
+    runTest('Sandbox: TypeScript interface ve generics içeren AI kodu hatasız derlenir', () => {
+      const tsCode = `
+        interface TodoItem {
+          id: number;
+          text: string;
+          done: boolean;
+        }
+        function App() {
+          const [todos, setTodos] = useState<TodoItem[]>([]);
+          const handleAdd = (e: React.FormEvent) => { e.preventDefault(); };
+          return <div>{todos.length}</div>;
+        }
+      `;
+      const transformed = sandbox.Babel.transform(tsCode, {
+        filename: 'app.tsx',
+        presets: ['typescript', ['react', { runtime: 'classic' }]]
+      }).code;
+
+      assert.ok(transformed.includes('function App'), 'App fonksiyonu derlenmiş olmalı');
+      assert.strictEqual(transformed.includes('interface TodoItem'), false, 'TypeScript interface kodu kaldırılmış olmalı');
+      resolve();
+    });
+  });
+
+  // Test 3.3: Mükerrer useState ve hook tanımlarının çakışmaması
+  await new Promise((resolve) => {
+    runTest('Sandbox: Mükerrer const { useState } tanımları Identifier already declared hatası vermez', () => {
+      let rawCode = `
+        const { useState, useEffect } = React;
+        function App() {
+          const [count, setCount] = useState(0);
+          return <button onClick={() => setCount(count + 1)}>{count}</button>;
+        }
+      `;
+      // App.tsx'teki temizleyiciyi uygulayalım
+      rawCode = rawCode.replace(/(?:const|let|var)\s*\{[^}]*\}\s*=\s*React;?/g, '/* React hooks global */');
+
+      const codeToTransform = [
+        "var useState = React.useState, useEffect = React.useEffect;",
+        rawCode,
+        "var _candidate = null;",
+        "if (typeof App !== 'undefined') { _candidate = App; }",
+        "window.__CurrentApp = _candidate;"
+      ].join('\n');
+
+      const transformed = sandbox.Babel.transform(codeToTransform, {
+        filename: 'app.tsx',
+        presets: ['typescript', ['react', { runtime: 'classic' }]]
+      }).code;
+
+      const mockReact = {
+        useState: (init) => [init, () => {}],
+        useEffect: () => {},
+        createElement: (type, props, ...children) => ({ type, props, children })
+      };
+      const testWindow = { React: mockReact };
+
+      const fn = new Function('React', 'window', transformed);
+      fn(mockReact, testWindow);
+      assert.ok(typeof testWindow.__CurrentApp === 'function', 'App bileşeni başarıyla tanımlandı');
+      resolve();
+    });
+  });
+
+  // Test 3.4: İthal edilmemiş Lucide ikonlarının otomatik fallback ile çökmemesi
+  await new Promise((resolve) => {
+    runTest('Sandbox: Kodda ithal edilmemiş ikonlar (Check, Trash2, Sparkles) ReferenceError vermez', () => {
+      const codeWithIcons = `
+        function App() {
+          return (
+            <div>
+              <Sparkles className="w-4 h-4" />
+              <Check className="w-5 h-5" />
+              <Trash2 className="w-4 h-4" />
+            </div>
+          );
+        }
+      `;
+
+      const detectedIcons = Array.from(new Set(codeWithIcons.match(/<([A-Z][a-zA-Z0-9_]*)/g) || []))
+        .map(t => t.slice(1))
+        .filter(t => !['App', 'Main', 'React', 'Fragment', 'ErrorBoundary'].includes(t));
+
+      const iconDeclarations = detectedIcons.map(name => {
+        return `if (typeof ${name} === 'undefined') { var ${name} = window.LucideIcons['${name}']; }`;
+      }).join('\n');
+
+      const codeToTransform = [
+        iconDeclarations,
+        codeWithIcons,
+        "window.__CurrentApp = App;"
+      ].join('\n');
+
+      const transformed = sandbox.Babel.transform(codeToTransform, {
+        filename: 'app.tsx',
+        presets: ['typescript', ['react', { runtime: 'classic' }]]
+      }).code;
+
+      const mockReact = {
+        createElement: (type, props, ...children) => {
+          if (typeof type === 'function') {
+            return type(props);
+          }
+          return { type, props, children };
+        }
+      };
+
+      const testWindow = {
+        React: mockReact,
+        LucideIcons: new Proxy({}, {
+          get: (target, prop) => (props) => ({ type: 'span', icon: prop })
+        })
+      };
+
+      const fn = new Function('React', 'window', transformed);
+      fn(mockReact, testWindow);
+      assert.ok(typeof testWindow.__CurrentApp === 'function', 'App bileşeni hatasız ayağa kalktı');
+      resolve();
+    });
+  });
+
+  // -------------------------------------------------------------
+  // GRUP 4: ZIP PAKETLEME VE DOSYA DIŞA AKTARMA TESTLERİ
+  // -------------------------------------------------------------
+  console.log('\n--- BÖLÜM 4: ZIP Paketleme ve Export Testleri ---');
+
+  await new Promise((resolve) => {
+    runTest('Export: JSZip ile tam proje paketi (SPEC.md, index.html, App.jsx, README.md) üretimi', async () => {
+      const zip = new JSZip();
+      const testSpec = {
+        title: 'Test Micro SaaS',
+        tagline: 'Otomatik test çözümü',
+        userFlows: ['Akış 1', 'Akış 2'],
+        dataModel: [{ table: 'users', description: 'Kullanıcılar' }],
+        screens: ['Ana Panel'],
+        outOfScope: ['Özel API']
+      };
+      const testCode = `function App() { return <div>Canlı Test Uygulaması</div>; }`;
+
+      const specMd = `# ${testSpec.title}\n\n> ${testSpec.tagline}`;
+      zip.file("SPEC.md", specMd);
+      zip.file("index.html", "<!DOCTYPE html><html><body>Test</body></html>");
+      zip.file("App.jsx", testCode);
+      zip.file("README.md", `# ${testSpec.title}\n\nNasıl çalıştırılır?`);
+
+      const content = await zip.generateAsync({ type: "nodebuffer" });
+      assert.ok(content.length > 100, 'Geçerli ZIP arşivi üretildi');
+      
+      // ZIP içeriğini doğrula
+      const unzipped = await JSZip.loadAsync(content);
+      assert.ok(unzipped.file("SPEC.md"), 'SPEC.md zip içinde var');
+      assert.ok(unzipped.file("index.html"), 'index.html zip içinde var');
+      assert.ok(unzipped.file("App.jsx"), 'App.jsx zip içinde var');
+      assert.ok(unzipped.file("README.md"), 'README.md zip içinde var');
+      resolve();
+    });
+  });
+
+  // -------------------------------------------------------------
+  // GRUP 5: PROJE GEÇMİŞİ VE VERİ YAPISI TESTLERİ
+  // -------------------------------------------------------------
+  console.log('\n--- BÖLÜM 5: Proje Kaydetme & Veri Bütünlüğü Testleri ---');
+
+  await new Promise((resolve) => {
+    runTest('Data: SavedProject veri yapısı ve geri yükleme bütünlüğü', () => {
+      const project = {
+        id: 'proj-12345',
+        createdAt: new Date().toISOString(),
+        idea: {
+          title: 'Test SaaS',
+          problem: 'Problem açıklaması',
+          targetUser: 'Geliştiriciler',
+          alternatives: 'Alternatif yok',
+          whyNow: 'Hemen şimdi',
+          mvpScope: ['MVP 1'],
+          feasibilityNote: '1 günde çıkar',
+          scores: { pain: 8, lackOfSolutions: 7, feasibility: 9, monetization: 8 },
+          totalScore: 32
+        },
+        spec: {
+          title: 'Test SaaS',
+          tagline: 'Hızlı çözüm',
+          userFlows: ['Adım 1'],
+          dataModel: [{ table: 'tasks', description: 'Görevler' }],
+          screens: ['Panel'],
+          outOfScope: ['Yok'],
+          buildChecklist: ['Kurulum']
+        },
+        code: 'function App() { return <div>Test</div>; }',
+        chatHistory: [
+          { sender: 'user', text: 'Buton ekle', timestamp: '14:00' },
+          { sender: 'ai', text: 'Eklendi', timestamp: '14:01' }
+        ]
+      };
+
+      const serialized = JSON.stringify([project]);
+      const deserialized = JSON.parse(serialized);
+
+      assert.strictEqual(deserialized.length, 1);
+      assert.strictEqual(deserialized[0].id, 'proj-12345');
+      assert.strictEqual(deserialized[0].chatHistory.length, 2);
+      assert.strictEqual(deserialized[0].idea.totalScore, 32);
       resolve();
     });
   });

@@ -167,14 +167,15 @@ function getRealisticFallbackIdeas(): any[] {
 // Ana fikir uretme handler'i
 export async function generateIdeasHandler(req: Request, res: Response) {
   try {
-    const apiKey = process.env.GROQ_API_KEY;
+    const apiKey = (req.headers['x-groq-api-key'] as string) || req.body?.customApiKey || process.env.GROQ_API_KEY;
     if (!apiKey) {
       console.warn("GROQ_API_KEY ayarlanmamış, doğrulanmış pazar SaaS fikirleri devreye alınıyor.");
       res.json({
         ideas: getRealisticFallbackIdeas(),
         warnings: [
-          "GROQ_API_KEY tanımlanmadığı için güncel pazar sinyalleriyle doğrulanmış gerçek mikro-SaaS fikirleri yüklendi. Canlı AI için Vercel veya .env üzerinden GROQ_API_KEY ekleyebilirsiniz."
+          "GROQ_API_KEY is not configured. Fallback SaaS ideas loaded. You can provide your own free Groq API key in Settings."
         ],
+        isQuotaExceeded: true,
         rawSignals: { reddit: [], trends: [] },
       });
       return;
@@ -356,16 +357,27 @@ JSON Şeması:
       }
     }
 
+    const isQuotaError = lastError?.status === 429 || 
+      lastError?.message?.toLowerCase().includes('rate limit') || 
+      lastError?.message?.toLowerCase().includes('quota') ||
+      lastError?.message?.toLowerCase().includes('tokens per minute') ||
+      lastError?.message?.toLowerCase().includes('requests per day');
+
     let finalIdeas = validIdeas;
     if (!finalIdeas || finalIdeas.length === 0) {
       console.warn("AI modelleri geçerli özgün fikir üretemedi, pazar trendine uygun acil durum fikirleri devreye alınıyor.");
       finalIdeas = getRealisticFallbackIdeas();
-      warnings.push("Yapay zeka modelleri yoğunluk nedeniyle geçici olarak yanıt veremedi; güncel pazar sinyalleriyle doğrulanmış gerçek SaaS fikirleri yüklendi.");
+      warnings.push(
+        isQuotaError 
+          ? "AI rate limit or quota exceeded. Default verified SaaS ideas loaded."
+          : "Yapay zeka modelleri yoğunluk nedeniyle geçici olarak yanıt veremedi; güncel pazar sinyalleriyle doğrulanmış gerçek SaaS fikirleri yüklendi."
+      );
     }
 
     res.json({
       ideas: finalIdeas,
       warnings,
+      isQuotaExceeded: !!isQuotaError,
       rawSignals: {
         reddit: redditData,
         trends: trendData,
