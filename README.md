@@ -16,6 +16,10 @@
 
 </div>
 
+<div align="center">
+  <img src="preview.gif" alt="Project Preview" width="100%" />
+</div>
+
 ---
 
 > **Stop brainstorming. Start shipping.**  
