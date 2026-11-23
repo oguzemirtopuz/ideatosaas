@@ -92,7 +92,8 @@ The journey from **"I have an idea"** to **"Here is a working prototype users ca
 ```
 
 ### 1. Market Intelligence & Architectural PRD
-- Analyzes simulated market signals (Reddit communities, search trends, audience pain points).
+- Real-time market signal engine aggregating live builder discussions, user complaints, and product pain points from Hacker News (Algolia REST API), Dev.to SaaS feeds, Reddit, and curated Google Trends telemetry.
+- Multi-tier resilient fallback architecture guaranteeing continuous signal pipeline without rate limits or bot blocks.
 - Generates a full product specification: Value Proposition, Target Audience (ICP), Core Features, Technical Architecture, and explicit **v1 Boundaries** (what's built now vs. what's out of scope).
 
 ### 2. Sandboxed Live Execution Engine
@@ -115,7 +116,8 @@ The journey from **"I have an idea"** to **"Here is a working prototype users ca
 
 ## 🛠️ Tech Stack & Architecture
 
-- **Frontend Core:** React 18, Vite 5, Tailwind CSS, Lucide React Icons
+- **Frontend Core:** React 18 / React 19, Vite, Tailwind CSS, Lucide React Icons
+- **Market Signal Harvester:** Hacker News Algolia Search API, Dev.to RSS, Reddit feeds, Google Trends telemetry with graceful degradation fallbacks.
 - **AI Inference Engine:**
   - **Google Gemini 2.5 Flash / Pro** (native high-speed multi-stage reasoning)
   - **Groq SDK (LLaMA 3.3 70B Versatile)** (ultra-low latency fallback and BYOK support)
