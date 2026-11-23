@@ -567,6 +567,37 @@ async function testApiEndpoints() {
     });
   });
 
+  // Test 5.2: SavedIdea (Fikir Havuzu) Veri Bütünlüğü
+  await new Promise((resolve) => {
+    runTest('Data: SavedIdea (Fikir Havuzu / Bookmark) veri yapısı ve serializasyonu', () => {
+      const savedIdea = {
+        id: 'idea_123456',
+        savedAt: '23 Kas 21:00',
+        idea: {
+          title: 'SpeedLead AI',
+          problem: 'Emlakçılar gelen maillere geç dönüyor',
+          targetUser: 'Emlak Danışmanları',
+          whyNow: 'WhatsApp Cloud API ucuzladı',
+          mvpScope: ['Oto cevaplama'],
+          feasibilityNote: '1 günde hazır',
+          scores: { pain: 9, lackOfSolutions: 8, feasibility: 10, monetization: 9 },
+          totalScore: 36,
+          verdict: 'high_potential',
+          verdictReason: 'B2B acil acı noktası çözer'
+        }
+      };
+
+      const serialized = JSON.stringify([savedIdea]);
+      const deserialized = JSON.parse(serialized);
+
+      assert.strictEqual(deserialized.length, 1);
+      assert.strictEqual(deserialized[0].id, 'idea_123456');
+      assert.strictEqual(deserialized[0].idea.verdict, 'high_potential');
+      assert.strictEqual(deserialized[0].idea.totalScore, 36);
+      resolve();
+    });
+  });
+
   // ÖZET RAPOR
   console.log('\n========================================================');
   console.log(`📊 TEST SONUÇLARI: ${passedTests} GEÇTİ, ${failedTests} BAŞARISIZ (Toplam: ${totalTests})`);

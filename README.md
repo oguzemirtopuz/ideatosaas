@@ -96,6 +96,7 @@ The journey from **"I have an idea"** to **"Here is a working prototype users ca
 - Real-time market signal engine aggregating live builder discussions, user complaints, and product pain points from Hacker News (Algolia REST API), Dev.to SaaS feeds, Reddit, and curated Google Trends telemetry.
 - **Negative Filtering & Reality Engine:** Intelligently blacklists non-viable ideas (oversaturated calendars, low-margin utilities, single-dev cybersecurity traps) while prioritizing high-velocity B2B micro-SaaS opportunities.
 - **Investor Badges & AI Judge Recommendation:** Evaluates every concept with visual verdict badges (`High Potential`, `Niche Opportunity`, `Trap`) and highlights the strongest candidate with actionable rationale.
+- **Idea Vault & Bookmark Engine:** One-click bookmarking for generated concepts. Founders can hoard vetted opportunities into their local vault and trigger on-demand Stage 2 prototyping anytime.
 - Multi-tier resilient fallback architecture guaranteeing continuous signal pipeline without rate limits or bot blocks.
 - Generates a full product specification: Value Proposition, Target Audience (ICP), Core Features, Technical Architecture, and explicit **v1 Boundaries** (what's built now vs. what's out of scope).
 

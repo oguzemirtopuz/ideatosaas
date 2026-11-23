@@ -5,6 +5,7 @@ export interface Translations {
   appTitle: string;
   appSubtitle: string;
   historyBtn: string;
+  vaultBtn: string;
   settingsBtn: string;
   lightMode: string;
   darkMode: string;
@@ -112,6 +113,17 @@ export interface Translations {
   deleteProjectBtn: string;
   closeBtn: string;
 
+  // Fikir Havuzu & Bookmark
+  bookmarkIdeaTooltip: string;
+  unbookmarkIdeaTooltip: string;
+  vaultModalTitle: string;
+  vaultModalDesc: string;
+  noSavedIdeas: string;
+  buildSavedIdeaBtn: string;
+  deleteSavedIdeaBtn: string;
+  ideaSavedToast: string;
+  ideaRemovedToast: string;
+
   // Uyarılar
   quotaWarningTitle: string;
   quotaWarningDesc: string;
@@ -124,6 +136,7 @@ export const translations: Record<Language, Translations> = {
     appTitle: "Idea to SaaS",
     appSubtitle: "Otonom Ürün Prototipleme & GTM Motoru",
     historyBtn: "Projelerim",
+    vaultBtn: "Fikir Havuzu",
     settingsBtn: "API & Hesap",
     lightMode: "Açık Mod",
     darkMode: "Koyu Mod",
@@ -231,7 +244,18 @@ export const translations: Record<Language, Translations> = {
     deleteProjectBtn: "Sil",
     closeBtn: "Kapat",
 
-    // Uyarılar
+    // Fikir Havuzu & Bookmark
+    bookmarkIdeaTooltip: "Fikri Havuzuma Kaydet",
+    unbookmarkIdeaTooltip: "Fikri Havuzumdan Çıkar",
+    vaultModalTitle: "Kaydedilen Fikir Havuzu",
+    vaultModalDesc: "Daha sonra prototiplemek üzere kaydettiğiniz mikro-SaaS fikirleri.",
+    noSavedIdeas: "Henüz kaydedilmiş bir fikir yok. Beğendiğiniz fikirlerin sağ üstündeki yer imi (bookmark) butonuna tıklayarak havuza ekleyebilirsiniz!",
+    buildSavedIdeaBtn: "🚀 Şimdi İnşa Et (Aşama 2)",
+    deleteSavedIdeaBtn: "Kaldır",
+    ideaSavedToast: "Fikir havuzuna kaydedildi!",
+    ideaRemovedToast: "Fikir havuzundan çıkarıldı.",
+
+  // Uyarılar
     quotaWarningTitle: "Kota / API Uyarısı",
     quotaWarningDesc: "Sistemin varsayılan kotası doldu. Kesintisiz kullanım için Ayarlar bölümünden kendi ücretsiz API anahtarınızı girebilirsiniz.",
     missingKeyWarning: "API anahtarı bulunamadı, güvenli pazar fikirleri yüklendi."
@@ -241,6 +265,7 @@ export const translations: Record<Language, Translations> = {
     appTitle: "Idea to SaaS",
     appSubtitle: "Autonomous Product Prototyping & GTM Engine",
     historyBtn: "My Projects",
+    vaultBtn: "Idea Vault",
     settingsBtn: "API & Account",
     lightMode: "Light Mode",
     darkMode: "Dark Mode",
@@ -348,7 +373,18 @@ export const translations: Record<Language, Translations> = {
     deleteProjectBtn: "Delete",
     closeBtn: "Close",
 
-    // Uyarılar
+    // Fikir Havuzu & Bookmark
+    bookmarkIdeaTooltip: "Save Idea to Vault",
+    unbookmarkIdeaTooltip: "Remove from Vault",
+    vaultModalTitle: "Saved Idea Vault",
+    vaultModalDesc: "Micro-SaaS concepts you bookmarked to build when you have time.",
+    noSavedIdeas: "No saved ideas yet. Click the bookmark icon on any idea card to save it for later!",
+    buildSavedIdeaBtn: "🚀 Build This Now (Stage 2)",
+    deleteSavedIdeaBtn: "Remove",
+    ideaSavedToast: "Idea saved to vault!",
+    ideaRemovedToast: "Idea removed from vault.",
+
+  // Uyarılar
     quotaWarningTitle: "Quota / API Notice",
     quotaWarningDesc: "Shared quota limit reached. Provide your own free API key in Settings for unlimited generations.",
     missingKeyWarning: "API key unconfigured, loaded verified market fallback ideas."

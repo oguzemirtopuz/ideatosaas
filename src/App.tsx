@@ -7,7 +7,7 @@ import {
   Layers, Hammer, Eye, Play, Sparkles, Check, Download, ExternalLink,
   TrendingUp, BarChart3, Users, Archive, Send, MessageSquare, 
   UserCheck, History, Trash2, FolderGit2, RefreshCw, Key, Settings, Copy,
-  Sun, Moon, Globe
+  Sun, Moon, Globe, Bookmark, BookmarkCheck
 } from 'lucide-react';
 
 interface IdeaScore {
@@ -79,6 +79,12 @@ interface SavedProject {
   chatHistory: ChatMessage[];
 }
 
+interface SavedIdea {
+  id: string;
+  savedAt: string;
+  idea: Idea;
+}
+
 export default function App() {
   // Kullanıcı ve Oturum Yönetimi
   const [userEmail, setUserEmail] = useState<string>(() => {
@@ -126,6 +132,23 @@ export default function App() {
     }
   });
   const [showHistoryModal, setShowHistoryModal] = useState<boolean>(false);
+
+  // Fikir Havuzu (Kaydedilen Fikirler)
+  const [savedIdeas, setSavedIdeas] = useState<SavedIdea[]>(() => {
+    try {
+      const saved = localStorage.getItem('ideatosaas_saved_ideas');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [showVaultModal, setShowVaultModal] = useState<boolean>(false);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('ideatosaas_saved_ideas', JSON.stringify(savedIdeas));
+    } catch {}
+  }, [savedIdeas]);
 
   // Çoklu Dil (TR / EN)
   const [lang, setLang] = useState<Language>(() => {
@@ -651,6 +674,38 @@ export default function App() {
     alert(`${savedProjects.length} adet projenin başlıkları ve açıklamaları panoya kopyalandı!`);
   };
 
+  // Fikir Havuzu: Yer İmi Ekle / Kaldır
+  const toggleBookmarkIdea = (idea: Idea, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setSavedIdeas(prev => {
+      const exists = prev.some(item => item.idea.title.toLowerCase() === idea.title.toLowerCase());
+      if (exists) {
+        return prev.filter(item => item.idea.title.toLowerCase() !== idea.title.toLowerCase());
+      } else {
+        const newItem: SavedIdea = {
+          id: 'idea_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+          savedAt: new Date().toLocaleDateString(lang === 'tr' ? 'tr-TR' : 'en-US', {
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          }),
+          idea
+        };
+        return [newItem, ...prev];
+      }
+    });
+  };
+
+  const isIdeaBookmarked = (idea: Idea) => {
+    return savedIdeas.some(item => item.idea.title.toLowerCase() === idea.title.toLowerCase());
+  };
+
+  const deleteSavedIdea = (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setSavedIdeas(prev => prev.filter(item => item.id !== id));
+  };
+
   // React kodunu temizleme ve import/export kalıntılarını arındırma fonksiyonu
   const sanitizeReactCode = (code: string): string => {
     if (!code) return "";
@@ -1130,6 +1185,16 @@ export default function App() {
             >
               <History className="w-3.5 h-3.5 text-neutral-600" />
               {t.historyBtn} ({savedProjects.length})
+            </button>
+
+            {/* Fikir Havuzu Butonu */}
+            <button
+              onClick={() => setShowVaultModal(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-neutral-200 rounded-lg text-xs font-semibold text-neutral-700 hover:bg-neutral-50 transition-colors shadow-sm cursor-pointer"
+              title={t.vaultModalTitle}
+            >
+              <Bookmark className="w-3.5 h-3.5 text-amber-500 fill-amber-500/30" />
+              {t.vaultBtn} ({savedIdeas.length})
             </button>
 
             {/* Kullanıcı Giriş / Hesap ve Ayarlar */}
@@ -1869,8 +1934,23 @@ export default function App() {
                         {idea.title}
                       </h3>
                     </div>
-                    <div className="flex items-center justify-center bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 px-3 py-1 rounded-full text-xs font-bold border border-green-200 dark:border-green-800 shrink-0 ml-3">
-                      {idea.totalScore}/40
+                    <div className="flex items-center gap-2 shrink-0 ml-3">
+                      <div className="flex items-center justify-center bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 px-3 py-1 rounded-full text-xs font-bold border border-green-200 dark:border-green-800">
+                        {idea.totalScore}/40
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => toggleBookmarkIdea(idea, e)}
+                        title={isIdeaBookmarked(idea) ? t.unbookmarkIdeaTooltip : t.bookmarkIdeaTooltip}
+                        aria-label={isIdeaBookmarked(idea) ? t.unbookmarkIdeaTooltip : t.bookmarkIdeaTooltip}
+                        className={`p-1.5 rounded-full border transition-all cursor-pointer ${
+                          isIdeaBookmarked(idea)
+                            ? 'bg-amber-500/15 border-amber-500/40 text-amber-500 shadow-xs'
+                            : 'bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 border-neutral-200 dark:border-neutral-700 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200'
+                        }`}
+                      >
+                        <Bookmark className={`w-4 h-4 transition-transform active:scale-125 ${isIdeaBookmarked(idea) ? 'fill-amber-500 text-amber-500' : ''}`} />
+                      </button>
                     </div>
                   </div>
 
@@ -2122,6 +2202,113 @@ export default function App() {
                     </div>
                   ))
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL 3: KAYDEDİLEN FİKİR HAVUZU (IDEA VAULT) */}
+        {showVaultModal && (
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl p-6 max-w-2xl w-full shadow-2xl border border-neutral-200 max-h-[80vh] flex flex-col">
+              <div className="flex items-center justify-between border-b border-neutral-200 pb-3 mb-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-amber-500/15 rounded-xl text-amber-500">
+                    <Bookmark className="w-5 h-5 fill-amber-500" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-neutral-900 flex items-center gap-2">
+                      {t.vaultModalTitle}
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                        {savedIdeas.length}
+                      </span>
+                    </h3>
+                    <p className="text-xs text-neutral-500">{t.vaultModalDesc}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowVaultModal(false)}
+                  className="text-neutral-400 hover:text-neutral-900 text-sm font-bold p-1 ml-1 cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+                {savedIdeas.length === 0 ? (
+                  <div className="text-center py-12 text-neutral-400 text-xs px-4">
+                    <Bookmark className="w-8 h-8 mx-auto mb-2 opacity-40 text-amber-500" />
+                    {t.noSavedIdeas}
+                  </div>
+                ) : (
+                  savedIdeas.map((item) => (
+                    <div
+                      key={item.id}
+                      className="bg-neutral-50 hover:bg-neutral-100/80 border border-neutral-200 p-4 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors"
+                    >
+                      <div className="space-y-1.5 flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h4 className="font-bold text-sm text-neutral-900 truncate">
+                            {item.idea.title}
+                          </h4>
+                          {item.idea.verdict && (
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                              item.idea.verdict === 'high_potential'
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                                : item.idea.verdict === 'trap'
+                                ? 'bg-rose-50 text-rose-700 border-rose-300'
+                                : 'bg-amber-50 text-amber-700 border-amber-300'
+                            }`}>
+                              {item.idea.verdict === 'high_potential'
+                                ? t.badgeHighPotential
+                                : item.idea.verdict === 'trap'
+                                ? t.badgeTrap
+                                : t.badgeNiche}
+                            </span>
+                          )}
+                          <span className="text-[10px] px-2 py-0.5 bg-white border border-neutral-200 rounded-full font-bold text-neutral-600">
+                            {item.idea.totalScore}/40
+                          </span>
+                        </div>
+                        <p className="text-xs text-neutral-600 line-clamp-2">
+                          {item.idea.problem}
+                        </p>
+                        <div className="text-[10px] text-neutral-400 flex items-center gap-3 pt-0.5">
+                          <span>📅 {item.savedAt}</span>
+                          <span>🎯 {item.idea.targetUser}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                        <button
+                          onClick={() => {
+                            setShowVaultModal(false);
+                            handleSelectIdea(item.idea);
+                          }}
+                          className="px-3 py-1.5 bg-neutral-900 text-white rounded-lg text-xs font-semibold hover:bg-neutral-800 transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
+                        >
+                          {t.buildSavedIdeaBtn}
+                        </button>
+                        <button
+                          onClick={(e) => deleteSavedIdea(item.id, e)}
+                          className="p-1.5 bg-white border border-neutral-200 hover:bg-rose-50 hover:text-rose-600 rounded-lg text-neutral-400 transition-colors shadow-xs cursor-pointer"
+                          title={t.deleteSavedIdeaBtn}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="mt-4 pt-3 border-t border-neutral-200 flex justify-end">
+                <button
+                  onClick={() => setShowVaultModal(false)}
+                  className="px-4 py-1.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+                >
+                  {t.closeBtn}
+                </button>
               </div>
             </div>
           </div>
