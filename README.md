@@ -8,6 +8,7 @@
 [![Google Gemini](https://img.shields.io/badge/AI-Gemini_2.5_Flash-8E75C2?style=for-the-badge&logo=google-gemini&logoColor=white)](https://deepmind.google/technologies/gemini/)
 [![Groq Fast Inference](https://img.shields.io/badge/LLM-Groq_Llama_3.3_70B-F54E00?style=for-the-badge&logoColor=white)](https://groq.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
+[![Bilingual](https://img.shields.io/badge/Language-EN%20%7C%20TR-blue?style=for-the-badge)](README.md)
 
 <h1>🚀 Idea to SaaS</h1>
 <h3>From raw concept to interactive React prototype, technical PRD, and viral GTM blueprint in under 60 seconds.</h3>
@@ -93,6 +94,8 @@ The journey from **"I have an idea"** to **"Here is a working prototype users ca
 
 ### 1. Market Intelligence & Architectural PRD
 - Real-time market signal engine aggregating live builder discussions, user complaints, and product pain points from Hacker News (Algolia REST API), Dev.to SaaS feeds, Reddit, and curated Google Trends telemetry.
+- **Negative Filtering & Reality Engine:** Intelligently blacklists non-viable ideas (oversaturated calendars, low-margin utilities, single-dev cybersecurity traps) while prioritizing high-velocity B2B micro-SaaS opportunities.
+- **Investor Badges & AI Judge Recommendation:** Evaluates every concept with visual verdict badges (`High Potential`, `Niche Opportunity`, `Trap`) and highlights the strongest candidate with actionable rationale.
 - Multi-tier resilient fallback architecture guaranteeing continuous signal pipeline without rate limits or bot blocks.
 - Generates a full product specification: Value Proposition, Target Audience (ICP), Core Features, Technical Architecture, and explicit **v1 Boundaries** (what's built now vs. what's out of scope).
 
@@ -122,6 +125,7 @@ The journey from **"I have an idea"** to **"Here is a working prototype users ca
   - **Google Gemini 2.5 Flash / Pro** (native high-speed multi-stage reasoning)
   - **Groq SDK (LLaMA 3.3 70B Versatile)** (ultra-low latency fallback and BYOK support)
 - **Compilation & Execution:** In-browser standalone Babel runtime (`@babel/standalone`), safe `srcdoc` iframe isolation, defensive DOM script escaping.
+- **Bilingual i18n Architecture:** Native Turkish (TR) and English (EN) localization across all stages, interactive elements, export dialogs, and AI system prompts.
 - **Persistence & Export:** `localStorage` state persistence for cross-session project management, `JSZip` client-side archive generator.
 
 ---
