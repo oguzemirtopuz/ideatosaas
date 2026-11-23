@@ -187,7 +187,9 @@ function getRealisticFallbackIdeas(): any[] {
       ],
       feasibilityNote: "React + Tailwind ve Supabase ücretsiz katmanı ile 1 günde kurulabilir.",
       scores: { pain: 9, lackOfSolutions: 8, feasibility: 9, monetization: 8 },
-      totalScore: 34
+      totalScore: 34,
+      verdict: "high_potential",
+      verdictReason: "B2B müşteri kaybını doğrudan önler. İşletmeler negatif yorum uyarısı için tereddütsüz aylık $29-$49 öder."
     },
     {
       title: "FormToLead",
@@ -202,7 +204,9 @@ function getRealisticFallbackIdeas(): any[] {
       ],
       feasibilityNote: "Vercel serverless fonksiyonları ve Postgres free tier ile sıfır sunucu maliyeti.",
       scores: { pain: 8, lackOfSolutions: 7, feasibility: 10, monetization: 7 },
-      totalScore: 32
+      totalScore: 32,
+      verdict: "high_potential",
+      verdictReason: "Geliştiricilerin akut backend kurma acısını çözer. Sıfır sunucu maliyetiyle ilk günden karlı hale gelebilir."
     },
     {
       title: "ChangelogHero",
@@ -217,7 +221,9 @@ function getRealisticFallbackIdeas(): any[] {
       ],
       feasibilityNote: "GitHub API + Next.js SSR ile dakikalar içinde canlıya alınabilir.",
       scores: { pain: 7, lackOfSolutions: 8, feasibility: 9, monetization: 8 },
-      totalScore: 32
+      totalScore: 32,
+      verdict: "niche",
+      verdictReason: "Yazılımcılar için pratik ve şık bir araç; ancak pazar büyüklüğü B2B satış araçlarına kıyasla daha niş kalabilir."
     }
   ];
 }
@@ -286,6 +292,10 @@ Kriterler (1-10 puan):
 3. Teknik fizibilite - 1 günde çıkmalı (feasibility)
 4. Monetizasyon sinyali (monetization)
 
+Kati Kurallar:
+- verdict alanı: "high_potential" (kesinlikle yapılmalı, yüksek ROI), "niche" (güzel ama niş) veya "trap" (tuzak/zor pazar) olmalıdır.
+- verdictReason alanı: 1-2 cümlelik dürüst yatırımcı/gerçeklik yorumu içermelidir.
+
 Yanıtını KESİNLİKLE sadece aşağıdaki şemaya sahip tek elemanlı bir JSON dizisi olarak ver:
 [
   {
@@ -297,21 +307,36 @@ Yanıtını KESİNLİKLE sadece aşağıdaki şemaya sahip tek elemanlı bir JSO
     "mvpScope": ["1. Temel özellik", "2. Temel özellik", "3. Temel özellik"],
     "feasibilityNote": "1 günde sıfır maliyetle nasıl kurulacağının özeti",
     "scores": { "pain": 8, "lackOfSolutions": 7, "feasibility": 9, "monetization": 7 },
-    "totalScore": 31
+    "totalScore": 31,
+    "verdict": "high_potential",
+    "verdictReason": "Bu fikrin neden seçilmesi veya dikkat edilmesi gerektiğine dair 1-2 cümlelik gerçekçi analiz"
   }
 ]`;
     } else {
-      prompt = `Sen kıdemli bir startup kurucusu ve full-stack mimarsın.
-Görevin, aşağıdaki gerçek piyasa sinyallerini analiz ederek sıfır maliyetle (React/Tailwind, Supabase free tier, Vercel free tier) 1 günde kurulabilecek TAM 3 ADET FARKLI, ÖZGÜN ve GERÇEKÇİ Mikro-SaaS fikri üretmektir.
+      prompt = `Sen kıdemli bir startup kurucusu, solo kurucu mentoru ve full-stack mimarsın.
+Görevin, aşağıdaki gerçek piyasa sinyallerini analiz ederek sıfır maliyetle (React/Tailwind, Supabase free tier, Vercel free tier) 1 günde kurulabilecek TAM 3 ADET FARKLI, ÖZGÜN, YÜKSEK MONETİZASYON POTANSİYELİNE SAHİP Mikro-SaaS fikri üretmektir.
 
 Reddit Şikayetleri/Talepleri: ${JSON.stringify(redditData.slice(0, 10))}
 Google Trends (Bugün): ${JSON.stringify(trendData.slice(0, 10))}
+
+🚫 KATI YASAKLAR (KARA LİSTE - BU FİKİRLERİ KESİNLİKLE ÜRETME):
+1. Siber güvenlik, antivirüs, otonom savunma veya SIEM araçları KESİNLİKLE YASAKTIR (tek kişilik kurucu için imkansız, aylar sürer).
+2. Sadece log formatlayıcı, zaman/timezone dönüştürücü veya basit hesap makinesi gibi kimsenin para ödemeyeceği önemsiz yardımcı araçlar YASAKTIR.
+3. Takvim ve randevu planlayıcı araçlar YASAKTIR (Calendly ve Cal.com tekeli vardır; takvim senkronizasyon yükü çok büyüktür).
+4. Fatura, muhasebe veya yasal vergi mevzuatına bağlı araçlar YASAKTIR (yasal riskler ve operasyonel yük tek kişi için hantaldır).
+
+✅ ZORUNLU ODAK ALANLARI:
+1. Doğrudan müşteriye para kazandıran B2B Satış / Lead / Müşteri Dönüştürme araçları (Speed-to-lead, anında teklif, form yakalama vb.).
+2. AI ile kodlama yapan yazılımcıların akut sorunlarını çözen DevTools (kod bağlamı/context, mimari senkronizasyon, prompt kuralları vb.).
+3. Küçük işletmelerin (SMB) tekrarlayan manuel işlerini otomatikleştirip saatlerini kurtaran mikro-SaaS'lar.
 
 ÖNEMLİ KURALLAR:
 1. Kesinlikle 'Real Brand Name', 'Gerçek Marka Adı', 'Brand Name 1', 'Uygulama 1' gibi jenerik/sahte başlıklar KULLANMA. Fikirlere gerçek, yaratıcı SaaS adları ver (Örn: InvoicePulse, FormFlow, LeadCatch, RankTracker vb.).
 2. Problem tanımları gerçek ve ikna edici olmalı (2-3 cümle). '1-2 sentences describing the problem' gibi şablon metinleri asla kopyalama!
 3. mvpScope içinde 1 günde bitirilebilecek somut 3 ana özellik yaz. 'Feature 1', 'Özellik 1' gibi yer tutucular YASAKTIR.
-4. Çıktı KESİNLİKLE doğrudan '[' ile başlayıp ']' ile biten geçerli bir JSON dizisi olmalıdır.
+4. verdict alanı: "high_potential" | "niche" | "trap" değerlerinden biri olmalı.
+5. verdictReason: Fikrin para kazanma ve uygulanabilirlik potansiyelini özetleyen 1-2 cümlelik dürüst hakem yorumu olmalı.
+6. Çıktı KESİNLİKLE doğrudan '[' ile başlayıp ']' ile biten geçerli bir JSON dizisi olmalıdır.
 
 JSON Şeması:
 [
@@ -324,7 +349,9 @@ JSON Şeması:
     "mvpScope": ["1. Somut MVP özelliği", "2. Somut MVP özelliği", "3. Somut MVP özelliği"],
     "feasibilityNote": "Sıfır maliyet teknik fizibilite notu",
     "scores": { "pain": 8, "lackOfSolutions": 7, "feasibility": 9, "monetization": 7 },
-    "totalScore": 31
+    "totalScore": 31,
+    "verdict": "high_potential",
+    "verdictReason": "B2B müşteriye doğrudan satış getirir, 1 günde MVP'si çıkarılabilir."
   }
 ]`;
     }
@@ -432,8 +459,22 @@ JSON Şeması:
       );
     }
 
+    // Hakem tavsiyesi oluştur (Judge Recommendation - 4. Çözüm)
+    let judgeRecommendation = "";
+    if (finalIdeas && finalIdeas.length > 0) {
+      const sorted = [...finalIdeas].sort((a: any, b: any) => {
+        if (a.verdict === "high_potential" && b.verdict !== "high_potential") return -1;
+        if (b.verdict === "high_potential" && a.verdict !== "high_potential") return 1;
+        return (b.totalScore || 0) - (a.totalScore || 0);
+      });
+      const best = sorted[0];
+      const others = sorted.slice(1).map((i: any) => i.title).join(", ");
+      judgeRecommendation = `💡 Bu turun en güçlü adayı: "${best.title}". ${best.verdictReason || best.problem} ${others ? `(Diğer alternatifler: ${others}.)` : ''}`;
+    }
+
     res.json({
       ideas: finalIdeas,
+      judgeRecommendation,
       warnings,
       isQuotaExceeded: !!isQuotaError,
       rawSignals: {

@@ -26,6 +26,8 @@ interface Idea {
   feasibilityNote: string;
   scores: IdeaScore;
   totalScore: number;
+  verdict?: 'high_potential' | 'niche' | 'trap';
+  verdictReason?: string;
 }
 
 interface RawSignals {
@@ -126,6 +128,7 @@ export default function App() {
 
   // Aşama 1: Fikir Motoru
   const [ideas, setIdeas] = useState<Idea[]>([]);
+  const [judgeRecommendation, setJudgeRecommendation] = useState<string>('');
   const [warnings, setWarnings] = useState<string[]>([]);
   const [rawSignals, setRawSignals] = useState<RawSignals | null>(null);
   const [loading, setLoading] = useState(false);
@@ -286,6 +289,11 @@ export default function App() {
       
       if (data.ideas && Array.isArray(data.ideas)) {
         setIdeas(data.ideas);
+        if (data.judgeRecommendation) {
+          setJudgeRecommendation(data.judgeRecommendation);
+        } else {
+          setJudgeRecommendation('');
+        }
         if (data.warnings) setWarnings(data.warnings);
         if (data.rawSignals) setRawSignals(data.rawSignals);
       } else {
@@ -1766,18 +1774,80 @@ export default function App() {
               </div>
             )}
 
+            {/* AI Yatırımcı & Hakem Tavsiyesi (4. Çözüm) */}
+            {judgeRecommendation && (
+              <div className="mb-6 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-teal-500/5 to-indigo-500/10 border border-emerald-500/30 shadow-sm">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h4 className="text-xs font-bold text-neutral-900 dark:text-neutral-100 uppercase tracking-wider">
+                        Yatırımcı & Hakem Tavsiyesi
+                      </h4>
+                      <span className="text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-bold px-2 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-800">
+                        Canlı Eleme
+                      </span>
+                    </div>
+                    <p className="text-sm text-neutral-800 dark:text-neutral-200 leading-relaxed font-medium">
+                      {judgeRecommendation}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Fikir Kartları Listesi */}
             <div className={`grid gap-6 ${ideas.length === 1 ? 'max-w-xl mx-auto' : 'grid-cols-1 lg:grid-cols-3'}`}>
               {ideas.map((idea, idx) => (
                 <div key={idx} className="bg-white border border-neutral-200 rounded-2xl p-6 flex flex-col shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between mb-4">
-                    <h3 className="text-xl font-bold text-neutral-900 leading-tight">
-                      {idea.title}
-                    </h3>
-                    <div className="flex items-center justify-center bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-bold border border-green-200 shrink-0 ml-3">
+                  {/* Başlık ve Rozetler (2. Çözüm) */}
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1">
+                      {idea.verdict && (
+                        <div className="mb-1.5">
+                          {idea.verdict === 'high_potential' ? (
+                            <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300 px-2.5 py-0.5 rounded-full text-[11px] font-bold border border-emerald-300 dark:border-emerald-800">
+                              🟢 Yüksek Potansiyel
+                            </span>
+                          ) : idea.verdict === 'trap' ? (
+                            <span className="inline-flex items-center gap-1 bg-rose-50 text-rose-700 dark:bg-rose-950/70 dark:text-rose-300 px-2.5 py-0.5 rounded-full text-[11px] font-bold border border-rose-300 dark:border-rose-800">
+                              🔴 Tuzak / Zor Pazar
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 dark:bg-amber-950/70 dark:text-amber-300 px-2.5 py-0.5 rounded-full text-[11px] font-bold border border-amber-300 dark:border-amber-800">
+                              🟡 Niş Fırsat
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      <h3 className="text-xl font-bold text-neutral-900 dark:text-neutral-100 leading-tight">
+                        {idea.title}
+                      </h3>
+                    </div>
+                    <div className="flex items-center justify-center bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 px-3 py-1 rounded-full text-xs font-bold border border-green-200 dark:border-green-800 shrink-0 ml-3">
                       {idea.totalScore}/40
                     </div>
                   </div>
+
+                  {/* Yatırımcı Analizi / Verdict Reason */}
+                  {idea.verdictReason && (
+                    <div className={`p-3 rounded-xl text-xs mb-3 border ${
+                      idea.verdict === 'high_potential'
+                        ? 'bg-emerald-50/80 border-emerald-200 text-emerald-900 dark:bg-emerald-950/40 dark:border-emerald-800/60 dark:text-emerald-200'
+                        : idea.verdict === 'trap'
+                        ? 'bg-rose-50/80 border-rose-200 text-rose-900 dark:bg-rose-950/40 dark:border-rose-800/60 dark:text-rose-200'
+                        : 'bg-amber-50/80 border-amber-200 text-amber-900 dark:bg-amber-950/40 dark:border-amber-800/60 dark:text-amber-200'
+                    }`}>
+                      <div className="font-bold text-[10px] uppercase tracking-wider mb-0.5 opacity-80">
+                        Hakem Değerlendirmesi
+                      </div>
+                      <div className="leading-relaxed font-medium">
+                        {idea.verdictReason}
+                      </div>
+                    </div>
+                  )}
                   
                   <div className="space-y-4 flex-1">
                     <div>
