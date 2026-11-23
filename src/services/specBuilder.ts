@@ -380,15 +380,71 @@ export function sanitizeReactCode(code: string): string {
 export async function buildAppHandler(req: Request, res: Response) {
   try {
     const { idea, spec } = req.body;
+    const lang = req.body?.lang === "en" ? "en" : "tr";
     if (!idea || !spec) {
-      res.status(400).json({ error: "Fikir ve Spec verisi gerekli." });
+      res.status(400).json({ error: lang === "en" ? "Idea and Spec data required." : "Fikir ve Spec verisi gerekli." });
       return;
     }
 
     const apiKey = (req.headers['x-groq-api-key'] as string) || req.body?.customApiKey || process.env.GROQ_API_KEY;
     if (!apiKey) {
       console.warn("GROQ_API_KEY bulunamadı, garantili çalışan starter bileşen üretiliyor.");
-      const starterCode = `function App() {
+      const starterCode = lang === "en" ? `function App() {
+  const [items, setItems] = useState([
+    { id: 1, title: 'Initial Analysis Record', status: 'Completed', date: new Date().toLocaleDateString('en-US') },
+    { id: 2, title: 'User Flow Verification', status: 'Active', date: new Date().toLocaleDateString('en-US') }
+  ]);
+  const [inputVal, setInputVal] = useState('');
+
+  const handleAdd = (e) => {
+    e.preventDefault();
+    if (!inputVal.trim()) return;
+    setItems([...items, { id: Date.now(), title: inputVal.trim(), status: 'New', date: new Date().toLocaleDateString('en-US') }]);
+    setInputVal('');
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto p-6 space-y-6">
+      <div className="bg-white border border-neutral-200 p-6 rounded-2xl shadow-sm">
+        <div className="flex items-center justify-between border-b pb-4 mb-4">
+          <div>
+            <h1 className="text-xl font-bold text-neutral-900">${idea.title}</h1>
+            <p className="text-xs text-neutral-500 mt-1">${idea.problem}</p>
+          </div>
+          <span className="px-3 py-1 bg-green-50 text-green-700 text-xs font-semibold rounded-full border border-green-200">
+            Live v1
+          </span>
+        </div>
+
+        <form onSubmit={handleAdd} className="flex gap-2 mb-6">
+          <input
+            type="text"
+            value={inputVal}
+            onChange={(e) => setInputVal(e.target.value)}
+            placeholder="Enter new data or record entry..."
+            className="flex-1 px-4 py-2.5 text-sm border border-neutral-300 rounded-xl focus:outline-none focus:border-neutral-900"
+          />
+          <button type="submit" className="px-5 py-2.5 bg-neutral-900 text-white rounded-xl text-sm font-medium hover:bg-neutral-800 transition-colors">
+            Add
+          </button>
+        </form>
+
+        <div className="space-y-2">
+          <h3 className="text-xs font-bold uppercase text-neutral-400 tracking-wider">Operational Records</h3>
+          {items.map(item => (
+            <div key={item.id} className="flex items-center justify-between p-3.5 bg-neutral-50 border border-neutral-200 rounded-xl text-sm">
+              <span className="font-medium text-neutral-800">{item.title}</span>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-neutral-400">{item.date}</span>
+                <span className="px-2 py-0.5 bg-neutral-200 text-neutral-700 text-xs rounded-md font-medium">{item.status}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}` : `function App() {
   const [items, setItems] = useState([
     { id: 1, title: 'Başlangıç Analiz Kaydı', status: 'Tamamlandı', date: new Date().toLocaleDateString('tr-TR') },
     { id: 2, title: 'Kullanıcı Akış Doğrulaması', status: 'Aktif', date: new Date().toLocaleDateString('tr-TR') }
@@ -481,7 +537,8 @@ KESİN KURALLAR:
 3. ASLA import veya export yazma. React hook'ları (useState, useEffect, useMemo, useRef) doğrudan mevcuttur.
 4. Harici ikon kütüphaneleri (lucide-react vb.) IMPORT ETME. İkonlar için emojiler (✨, 🚀, ⚡, 📊, ⚙️, 🔍, 💡, 🎯 vb.) veya SVG kullan.
 5. STANDART DOĞAL REACT JSX KULLAN: Kesinlikle 'React.createElement' KULLANMA! Doğrudan standart JSX etiketleri yaz (örn: <div className="...">, <button onClick={() => setView('dashboard')}> vb.).
-6. Okunabilir, satır satır ve temiz girintili JSX yaz (minified tek satır yazma). Tailwind CSS sınıflarını kullan.`;
+6. Okunabilir, satır satır ve temiz girintili JSX yaz (minified tek satır yazma). Tailwind CSS sınıflarını kullan.
+7. DİL KURALI: ${lang === 'en' ? 'Tüm arayüz metinleri, buton etiketleri ve placeholderlar KESİNLİKLE İNGİLİZCE olmalıdır.' : 'Tüm arayüz metinleri ve butonlar Türkçe olmalıdır.'}`;
 
     let response = null;
     let lastError: any = null;

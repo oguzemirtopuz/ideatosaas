@@ -1267,9 +1267,11 @@ export default function App() {
             {specLoading && (
               <div className="bg-white border border-neutral-200 rounded-2xl p-12 text-center shadow-sm">
                 <Loader2 className="w-8 h-8 animate-spin mx-auto text-neutral-900 mb-3" />
-                <h3 className="text-lg font-bold text-neutral-900">Aşama 2: SPEC.md Çıkarılıyor...</h3>
+                <h3 className="text-lg font-bold text-neutral-900">{lang === 'en' ? 'Stage 2: Compiling SPEC.md...' : 'Aşama 2: SPEC.md Çıkarılıyor...'}</h3>
                 <p className="text-xs text-neutral-500 max-w-md mx-auto mt-1">
-                  "Önce spec, sonra kod" disiplinine uygun olarak veri modeli, akışlar ve kapsam sınırları hazırlanıyor.
+                  {lang === 'en' 
+                    ? 'Synthesizing data model, interactive user flows, and explicit v1 scope boundaries.' 
+                    : '"Önce spec, sonra kod" disiplinine uygun olarak veri modeli, akışlar ve kapsam sınırları hazırlanıyor.'}
                 </p>
               </div>
             )}
@@ -1285,7 +1287,7 @@ export default function App() {
                         activeTab === 'spec' ? 'bg-white text-neutral-900 shadow-sm border border-neutral-200' : 'text-neutral-500 hover:text-neutral-900'
                       }`}
                     >
-                      <Layers className="w-3.5 h-3.5" /> 1. Şartname (SPEC.md)
+                      <Layers className="w-3.5 h-3.5" /> {lang === 'en' ? '1. PRD Spec (SPEC.md)' : '1. Şartname (SPEC.md)'}
                     </button>
                     {builtCode && (
                       <button
@@ -1294,7 +1296,7 @@ export default function App() {
                           activeTab === 'preview' ? 'bg-white text-neutral-900 shadow-sm border border-neutral-200' : 'text-neutral-500 hover:text-neutral-900'
                         }`}
                       >
-                        <Eye className="w-3.5 h-3.5 text-green-600" /> 2. Canlı Uygulama & AI Chat
+                        <Eye className="w-3.5 h-3.5 text-green-600" /> {lang === 'en' ? '2. Live Sandbox & AI Copilot' : '2. Canlı Uygulama & AI Chat'}
                       </button>
                     )}
                     {builtCode && (
@@ -1304,7 +1306,7 @@ export default function App() {
                           activeTab === 'deploy' ? 'bg-white text-neutral-900 shadow-sm border border-neutral-200' : 'text-neutral-500 hover:text-neutral-900'
                         }`}
                       >
-                        <ExternalLink className="w-3.5 h-3.5 text-blue-600" /> 3. Deploy & ZIP İndir
+                        <ExternalLink className="w-3.5 h-3.5 text-blue-600" /> {lang === 'en' ? '3. Deploy & Export ZIP' : '3. Deploy & ZIP İndir'}
                       </button>
                     )}
                     {builtCode && (
@@ -1314,7 +1316,7 @@ export default function App() {
                           activeTab === 'code' ? 'bg-white text-neutral-900 shadow-sm border border-neutral-200' : 'text-neutral-500 hover:text-neutral-900'
                         }`}
                       >
-                        <Code className="w-3.5 h-3.5" /> 4. Kaynak Kod
+                        <Code className="w-3.5 h-3.5" /> {lang === 'en' ? '4. Source Code' : '4. Kaynak Kod'}
                       </button>
                     )}
                     {marketingData && (
@@ -1324,7 +1326,7 @@ export default function App() {
                           activeTab === 'marketing' ? 'bg-white text-indigo-700 shadow-sm border border-neutral-200' : 'text-neutral-500 hover:text-neutral-900'
                         }`}
                       >
-                        <BarChart3 className="w-3.5 h-3.5 text-indigo-600" /> 5. Marketing & Karar (CAC)
+                        <BarChart3 className="w-3.5 h-3.5 text-indigo-600" /> {lang === 'en' ? '5. Marketing & CAC Decision' : '5. Marketing & Karar (CAC)'}
                       </button>
                     )}
                   </div>
@@ -1335,14 +1337,16 @@ export default function App() {
                   {activeTab === 'spec' && (
                     <div className="space-y-6">
                       <div className="border-b border-neutral-100 pb-3">
-                        <span className="text-[11px] uppercase font-bold text-neutral-400 tracking-wider">Slogan & Vizyon</span>
+                        <span className="text-[11px] uppercase font-bold text-neutral-400 tracking-wider">
+                          {lang === 'en' ? 'Tagline & Product Vision' : 'Slogan & Vizyon'}
+                        </span>
                         <h3 className="text-lg font-bold text-neutral-900 mt-0.5">{spec.tagline}</h3>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="bg-neutral-50 p-4 rounded-xl border border-neutral-200/60">
                           <h4 className="text-xs font-bold text-neutral-900 mb-2 flex items-center gap-2">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-neutral-700" /> Kullanıcı Akışları (Adım Adım)
+                            <CheckCircle2 className="w-3.5 h-3.5 text-neutral-700" /> {t.tabUserFlows}
                           </h4>
                           <ul className="space-y-1.5 text-xs text-neutral-700">
                             {spec.userFlows.map((flow, idx) => (
@@ -1356,12 +1360,14 @@ export default function App() {
 
                         <div className="bg-neutral-50 p-4 rounded-xl border border-neutral-200/60">
                           <h4 className="text-xs font-bold text-neutral-900 mb-2 flex items-center gap-2">
-                            <Code className="w-3.5 h-3.5 text-neutral-700" /> Veri Modeli (Supabase / In-Memory)
+                            <Code className="w-3.5 h-3.5 text-neutral-700" /> {t.tabDataModel}
                           </h4>
                           <div className="space-y-1.5">
                             {spec.dataModel.map((model, idx) => (
                               <div key={idx} className="bg-white p-2 rounded-lg border border-neutral-200 text-[11px]">
-                                <span className="font-mono font-bold text-neutral-900">tablo: {model.table}</span>
+                                <span className="font-mono font-bold text-neutral-900">
+                                  {lang === 'en' ? `table: ${model.table}` : `tablo: ${model.table}`}
+                                </span>
                                 <p className="text-neutral-500 mt-0.5">{model.description}</p>
                               </div>
                             ))}
@@ -1370,7 +1376,7 @@ export default function App() {
 
                         <div className="bg-neutral-50 p-4 rounded-xl border border-neutral-200/60">
                           <h4 className="text-xs font-bold text-neutral-900 mb-2 flex items-center gap-2">
-                            <Layers className="w-3.5 h-3.5 text-neutral-700" /> Sayfa ve Ekran Listesi
+                            <Layers className="w-3.5 h-3.5 text-neutral-700" /> {t.tabScreens}
                           </h4>
                           <ul className="space-y-1 text-xs text-neutral-700">
                             {spec.screens.map((screen, idx) => (
@@ -1384,7 +1390,7 @@ export default function App() {
 
                         <div className="bg-neutral-50 p-4 rounded-xl border border-neutral-200/60">
                           <h4 className="text-xs font-bold text-neutral-900 mb-2 flex items-center gap-2 text-red-700">
-                            <AlertTriangle className="w-3.5 h-3.5 text-red-600" /> Kapsam Dışı Bırakılanlar (v1 Sınırı)
+                            <AlertTriangle className="w-3.5 h-3.5 text-red-600" /> {t.tabOutOfScope}
                           </h4>
                           <ul className="space-y-1 text-xs text-neutral-600">
                             {spec.outOfScope.map((item, idx) => (
@@ -1402,10 +1408,10 @@ export default function App() {
                           <button
                             onClick={handleBuildApp}
                             disabled={buildLoading}
-                            className="inline-flex items-center gap-2 px-6 py-2.5 bg-neutral-900 text-white rounded-xl font-medium hover:bg-neutral-800 transition-colors shadow-sm disabled:opacity-50 text-xs"
+                            className="inline-flex items-center gap-2 px-6 py-2.5 bg-neutral-900 text-white rounded-xl font-medium hover:bg-neutral-800 transition-colors shadow-sm disabled:opacity-50 text-xs cursor-pointer"
                           >
                             {buildLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-                            {buildLoading ? 'Uygulama İnşa Ediliyor...' : 'Bu Spec ile Uygulamayı Canlı İnşa Et'}
+                            {buildLoading ? t.buildingAppTitle : t.buildAppBtn}
                           </button>
                         </div>
                       )}
@@ -1425,10 +1431,10 @@ export default function App() {
                           <button
                             onClick={() => setPreviewKey(k => k + 1)}
                             className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium text-neutral-700 bg-white border border-neutral-200 rounded-lg hover:bg-neutral-100 transition-colors shadow-xs cursor-pointer"
-                            title="Önizlemeyi sıfırla ve yeniden yükle"
+                            title={lang === 'en' ? 'Reset & reload preview' : 'Önizlemeyi sıfırla ve yeniden yükle'}
                           >
                             <RefreshCw className="w-3 h-3" />
-                            <span>Yeniden Başlat</span>
+                            <span>{lang === 'en' ? 'Restart' : 'Yeniden Başlat'}</span>
                           </button>
                         </div>
                         <div className="flex-1 w-full h-full relative">
@@ -1447,9 +1453,11 @@ export default function App() {
                         <div className="p-3.5 border-b border-neutral-200 bg-white flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <MessageSquare className="w-4 h-4 text-indigo-600" />
-                            <h4 className="text-xs font-bold text-neutral-900">AI Değişiklik Asistanı</h4>
+                            <h4 className="text-xs font-bold text-neutral-900">{t.tabAiChat}</h4>
                           </div>
-                          <span className="text-[10px] px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full font-bold">Canlı Refactor</span>
+                          <span className="text-[10px] px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full font-bold">
+                            {lang === 'en' ? 'Live Copilot' : 'Canlı Refactor'}
+                          </span>
                         </div>
 
                         {/* Mesaj Listesi */}
@@ -1474,7 +1482,7 @@ export default function App() {
                           {modifyingCode && (
                             <div className="flex items-center gap-2 bg-white border border-neutral-200 p-2.5 rounded-xl text-neutral-600 text-xs shadow-xs">
                               <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600" />
-                              <span>Kod güncelleniyor ve canlıya yansıtılıyor...</span>
+                              <span>{t.aiApplyingChanges}</span>
                             </div>
                           )}
                         </div>
@@ -1485,17 +1493,17 @@ export default function App() {
                           <div className="px-3.5 py-2.5 border-t border-neutral-200/80 bg-neutral-100/70">
                             <div className="text-[10px] text-neutral-500 font-semibold mb-1.5 flex items-center gap-1">
                               <Sparkles className="w-3 h-3 text-indigo-600" />
-                              <span>v1 Sınırı Hızlı Ekle:</span>
+                              <span>{t.v1ChipsTitle}</span>
                             </div>
                             <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
                               {spec.outOfScope.map((item, idx) => (
                                 <button
                                   key={idx}
                                   type="button"
-                                  onClick={() => handleSendPromptModification(undefined, 'v1 sınırında bıraktığımız şu özelliği uygulamaya ekle: ' + item)}
+                                  onClick={() => handleSendPromptModification(undefined, (lang === 'en' ? 'Expand application with this out-of-scope v1 feature: ' : 'v1 sınırında bıraktığımız şu özelliği uygulamaya ekle: ') + item)}
                                   disabled={modifyingCode}
                                   className="text-[10px] px-2.5 py-1 bg-white border border-neutral-200 text-neutral-700 rounded-lg hover:bg-neutral-50 hover:border-neutral-300 transition-colors text-left truncate max-w-full cursor-pointer shadow-2xs font-medium flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
-                                  title={'Tıkla ve otomatik uygula: ' + item}
+                                  title={(lang === 'en' ? 'Click to apply: ' : 'Tıkla ve otomatik uygula: ') + item}
                                 >
                                   <span className="text-indigo-600 font-bold">+</span>
                                   <span>{item}</span>
@@ -1511,14 +1519,14 @@ export default function App() {
                               type="text"
                               value={chatInput}
                               onChange={(e) => setChatInput(e.target.value)}
-                              placeholder="Örn: Arka planı koyu yap, yeni buton ekle..."
+                              placeholder={t.chatPlaceholder}
                               disabled={modifyingCode}
                               className="flex-1 px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-xs placeholder:text-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-900"
                             />
                             <button
                               type="submit"
                               disabled={modifyingCode || !chatInput.trim()}
-                              className="p-2 bg-neutral-900 text-white rounded-lg hover:bg-neutral-800 disabled:opacity-40 transition-colors shrink-0"
+                              className="p-2 bg-neutral-900 text-white rounded-lg hover:bg-neutral-800 disabled:opacity-40 transition-colors shrink-0 cursor-pointer"
                             >
                               <Send className="w-3.5 h-3.5" />
                             </button>
@@ -1535,9 +1543,11 @@ export default function App() {
                         <div className="w-12 h-12 bg-green-50 text-green-700 rounded-2xl flex items-center justify-center mx-auto border border-green-200">
                           <ExternalLink className="w-6 h-6" />
                         </div>
-                        <h3 className="text-lg font-bold text-neutral-900">Aşama 3: Deploy & Dışa Aktarma</h3>
+                        <h3 className="text-lg font-bold text-neutral-900">{lang === 'en' ? 'Stage 3: Deploy & Production Export' : 'Aşama 3: Deploy & Dışa Aktarma'}</h3>
                         <p className="text-xs text-neutral-500">
-                          Üretilen bu çalışan mikro-SaaS uygulamasını ister tek bir bağımsız dosya veya tam ZIP olarak indirin, ister Vercel / Netlify'a yükleyin.
+                          {lang === 'en' 
+                            ? 'Export your functioning micro-SaaS prototype as an isolated bundle or full production project ZIP archive ready for Vercel / Netlify.'
+                            : 'Üretilen bu çalışan mikro-SaaS uygulamasını ister tek bir bağımsız dosya veya tam ZIP olarak indirin, ister Vercel / Netlify\'a yükleyin.'}
                         </p>
                       </div>
 
@@ -1545,10 +1555,10 @@ export default function App() {
                         <div className="bg-neutral-50 border border-neutral-200 p-5 rounded-xl flex flex-col justify-between space-y-4">
                           <div>
                             <h4 className="font-bold text-sm text-neutral-900 mb-1 flex items-center gap-2">
-                              <Archive className="w-4 h-4 text-neutral-700" /> Tam ZIP Paketi İndir
+                              <Archive className="w-4 h-4 text-neutral-700" /> {t.downloadFullZipBtn}
                             </h4>
                             <p className="text-xs text-neutral-500 leading-relaxed">
-                              İçinde `SPEC.md`, `index.html`, `App.jsx` ve `README.md` dosyalarını barındıran tam proje ZIP arşivini indirin.
+                              {t.downloadSuccessDesc}
                             </p>
                           </div>
                           <div className="space-y-2">
@@ -1612,7 +1622,7 @@ export default function App() {
                         <div className="bg-neutral-50 border border-neutral-200 p-5 rounded-2xl space-y-4">
                           <div className="flex items-center justify-between border-b border-neutral-200 pb-3">
                             <h4 className="font-bold text-sm text-neutral-900 flex items-center gap-2">
-                              <Users className="w-4 h-4 text-indigo-600" /> Aşama 4: Reklam Stratejisi
+                              <Users className="w-4 h-4 text-indigo-600" /> {lang === 'en' ? 'Stage 4: Launch & Ad Strategy' : 'Aşama 4: Reklam Stratejisi'}
                             </h4>
                             <span className="text-xs px-2.5 py-0.5 bg-indigo-50 text-indigo-700 rounded-full font-bold border border-indigo-200">
                               {marketingData.channel}
@@ -1621,20 +1631,20 @@ export default function App() {
 
                           <div className="space-y-3 text-xs">
                             <div className="bg-white p-3.5 rounded-xl border border-neutral-200">
-                              <span className="text-[10px] uppercase font-bold text-neutral-400">Reklam Başlığı</span>
+                              <span className="text-[10px] uppercase font-bold text-neutral-400">{lang === 'en' ? 'Ad Headline' : 'Reklam Başlığı'}</span>
                               <p className="font-semibold text-neutral-900 mt-0.5">{marketingData.adCopy.headline}</p>
                               
-                              <span className="text-[10px] uppercase font-bold text-neutral-400 block mt-2">Reklam Metni</span>
+                              <span className="text-[10px] uppercase font-bold text-neutral-400 block mt-2">{lang === 'en' ? 'Ad Body' : 'Reklam Metni'}</span>
                               <p className="text-neutral-600 mt-0.5">{marketingData.adCopy.body}</p>
 
-                              <span className="text-[10px] uppercase font-bold text-neutral-400 block mt-2">Harekete Geçirici Mesaj (CTA)</span>
+                              <span className="text-[10px] uppercase font-bold text-neutral-400 block mt-2">{lang === 'en' ? 'Call to Action (CTA)' : 'Harekete Geçirici Mesaj (CTA)'}</span>
                               <span className="inline-block mt-1 px-3 py-1 bg-neutral-900 text-white rounded text-[11px] font-bold">
                                 {marketingData.adCopy.callToAction}
                               </span>
                             </div>
 
                             <div>
-                              <span className="text-[10px] uppercase font-bold text-neutral-400 block mb-1.5">Kurulum Checklist'i</span>
+                              <span className="text-[10px] uppercase font-bold text-neutral-400 block mb-1.5">{lang === 'en' ? 'Launch Checklist' : 'Kurulum Checklist\'i'}</span>
                               <ul className="space-y-1.5 text-neutral-700">
                                 {marketingData.setupChecklist.map((item, idx) => (
                                   <li key={idx} className="flex items-start gap-2 bg-white p-2 rounded-lg border border-neutral-100">
@@ -1651,10 +1661,10 @@ export default function App() {
                         <div className="bg-neutral-50 border border-neutral-200 p-5 rounded-2xl space-y-4">
                           <div className="flex items-center justify-between border-b border-neutral-200 pb-3">
                             <h4 className="font-bold text-sm text-neutral-900 flex items-center gap-2">
-                              <BarChart3 className="w-4 h-4 text-green-600" /> Aşama 5: Karar Motoru (CAC)
+                              <BarChart3 className="w-4 h-4 text-green-600" /> {lang === 'en' ? 'Stage 5: Decision Engine (CAC)' : 'Aşama 5: Karar Motoru (CAC)'}
                             </h4>
                             <span className={`text-xs px-3 py-1 rounded-full font-bold border ${
-                              marketingData.simulation.decision === 'DEVAM ET' 
+                              marketingData.simulation.decision === 'DEVAM ET' || marketingData.simulation.decision === 'PROCEED'
                                 ? 'bg-green-50 text-green-700 border-green-200' 
                                 : 'bg-red-50 text-red-700 border-red-200'
                             }`}>
@@ -1664,19 +1674,19 @@ export default function App() {
 
                           <div className="grid grid-cols-2 gap-3 text-center">
                             <div className="bg-white p-3 rounded-xl border border-neutral-200">
-                              <span className="text-[10px] text-neutral-500 font-medium">Test Bütçesi</span>
+                              <span className="text-[10px] text-neutral-500 font-medium">{lang === 'en' ? 'Test Budget' : 'Test Bütçesi'}</span>
                               <div className="text-base font-bold text-neutral-900">${marketingData.simulation.testBudget}</div>
                             </div>
                             <div className="bg-white p-3 rounded-xl border border-neutral-200">
-                              <span className="text-[10px] text-neutral-500 font-medium">Ziyaretçi</span>
+                              <span className="text-[10px] text-neutral-500 font-medium">{lang === 'en' ? 'Visitors' : 'Ziyaretçi'}</span>
                               <div className="text-base font-bold text-neutral-900">{marketingData.simulation.visitors}</div>
                             </div>
                             <div className="bg-white p-3 rounded-xl border border-neutral-200">
-                              <span className="text-[10px] text-neutral-500 font-medium">Dönüşüm / Kayıt</span>
+                              <span className="text-[10px] text-neutral-500 font-medium">{lang === 'en' ? 'Conversions' : 'Dönüşüm / Kayıt'}</span>
                               <div className="text-base font-bold text-neutral-900">{marketingData.simulation.conversions}</div>
                             </div>
                             <div className="bg-white p-3 rounded-xl border border-neutral-200">
-                              <span className="text-[10px] text-neutral-500 font-medium">Hesaplanan CAC</span>
+                              <span className="text-[10px] text-neutral-500 font-medium">{lang === 'en' ? 'Calculated CAC' : 'Hesaplanan CAC'}</span>
                               <div className={`text-base font-bold ${marketingData.simulation.cac <= 1 ? 'text-green-600' : 'text-red-600'}`}>
                                 ${marketingData.simulation.cac}
                               </div>
@@ -1684,12 +1694,14 @@ export default function App() {
                           </div>
 
                           <div className={`p-4 rounded-xl border text-xs leading-relaxed ${
-                            marketingData.simulation.decision === 'DEVAM ET' 
+                            marketingData.simulation.decision === 'DEVAM ET' || marketingData.simulation.decision === 'PROCEED'
                               ? 'bg-green-50 border-green-200 text-green-900' 
                               : 'bg-red-50 border-red-200 text-red-900'
                           }`}>
                             <span className="font-bold block mb-1">
-                              {marketingData.simulation.decision === 'DEVAM ET' ? '🚀 Otomatik Karar: BÜTÇEYİ ARTIR' : '🛑 Otomatik Karar: DURDUR'}
+                              {marketingData.simulation.decision === 'DEVAM ET' || marketingData.simulation.decision === 'PROCEED'
+                                ? (lang === 'en' ? '🚀 Auto Decision: SCALE ACQUISITION' : '🚀 Otomatik Karar: BÜTÇEYİ ARTIR')
+                                : (lang === 'en' ? '🛑 Auto Decision: PAUSE & PIVOT' : '🛑 Otomatik Karar: DURDUR')}
                             </span>
                             {marketingData.simulation.decisionNote}
                           </div>
@@ -1758,7 +1770,7 @@ export default function App() {
             {warnings.length > 0 && (
               <div className="bg-amber-50 border border-amber-200 text-amber-800 px-5 py-3.5 rounded-xl mb-8 max-w-3xl mx-auto">
                 <h4 className="font-bold text-sm mb-1.5 flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4" /> Eksik Veri Kaynağı Uyarısı
+                  <AlertTriangle className="w-4 h-4" /> {t.quotaWarningTitle}
                 </h4>
                 <ul className="list-disc pl-5 space-y-1 text-xs">
                   {warnings.map((w, i) => <li key={i}>{w}</li>)}
@@ -1770,17 +1782,17 @@ export default function App() {
               <div className="mb-8 max-w-4xl mx-auto">
                 <button 
                   onClick={() => setShowRaw(!showRaw)}
-                  className="flex items-center gap-2 text-xs font-semibold text-neutral-600 hover:text-neutral-900 transition-colors mx-auto bg-white border border-neutral-200 px-3.5 py-1.5 rounded-full shadow-sm"
+                  className="flex items-center gap-2 text-xs font-semibold text-neutral-600 hover:text-neutral-900 transition-colors mx-auto bg-white border border-neutral-200 px-3.5 py-1.5 rounded-full shadow-sm cursor-pointer"
                 >
                   <FileText className="w-3.5 h-3.5" />
-                  {showRaw ? 'Ham Sinyalleri Gizle' : 'Kullanılan Ham Sinyalleri Gör'}
+                  {showRaw ? t.signalsToggleHide : t.signalsToggleShow}
                 </button>
                 
                 {showRaw && (
                   <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-left">
                     <div className="bg-white border border-neutral-200 rounded-xl p-3.5 shadow-sm h-52 overflow-y-auto">
                       <h4 className="font-bold text-[11px] uppercase tracking-wider text-neutral-400 mb-2 sticky top-0 bg-white pb-1 border-b border-neutral-100">
-                        Canlı Piyasa Sinyalleri ({rawSignals.reddit.length})
+                        {t.signalsDiscussionsTitle} ({rawSignals.reddit.length})
                       </h4>
                       <ul className="space-y-2 text-xs text-neutral-700">
                         {rawSignals.reddit.map((r, i) => (
@@ -1790,7 +1802,7 @@ export default function App() {
                     </div>
                     <div className="bg-white border border-neutral-200 rounded-xl p-3.5 shadow-sm h-52 overflow-y-auto">
                       <h4 className="font-bold text-[11px] uppercase tracking-wider text-neutral-400 mb-2 sticky top-0 bg-white pb-1 border-b border-neutral-100">
-                        Pazar Trendleri ({rawSignals.trends.length})
+                        {t.signalsTrendsTitle} ({rawSignals.trends.length})
                       </h4>
                       <div className="flex flex-wrap gap-1.5">
                         {rawSignals.trends.map((t, i) => (
@@ -1959,7 +1971,7 @@ export default function App() {
           <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-neutral-200">
               <div className="flex items-center justify-between mb-1">
-                <h3 className="text-lg font-bold text-neutral-900">Hesap & API Ayarları</h3>
+                <h3 className="text-lg font-bold text-neutral-900">{t.settingsModalTitle}</h3>
                 <button
                   onClick={() => setShowAuthModal(false)}
                   className="text-neutral-400 hover:text-neutral-900 text-xs p-1"
@@ -1968,18 +1980,18 @@ export default function App() {
                 </button>
               </div>
               <p className="text-xs text-neutral-500 mb-4">
-                Projeleriniz ve geçmişiniz e-posta profilinize kaydedilir.
+                {t.settingsModalDesc}
               </p>
               <form onSubmit={handleSaveSettings} className="space-y-4">
                 <div>
                   <label className="block text-[11px] font-semibold text-neutral-700 mb-1">
-                    E-posta Profili
+                    {t.emailLabel}
                   </label>
                   <input
                     type="email"
                     value={inputEmail}
                     onChange={(e) => setInputEmail(e.target.value)}
-                    placeholder="eposta@ornek.com (İsteğe bağlı)"
+                    placeholder={t.emailPlaceholder}
                     className="w-full px-3.5 py-2.5 border border-neutral-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-neutral-900"
                   />
                 </div>
@@ -1988,7 +2000,7 @@ export default function App() {
                   <div className="flex items-center justify-between">
                     <label className="text-[11px] font-semibold text-neutral-700 flex items-center gap-1">
                       <Key className="w-3 h-3 text-indigo-600" />
-                      Özel Groq API Anahtarı
+                      {t.apiKeyLabel}
                     </label>
                     <a 
                       href="https://console.groq.com/keys" 
@@ -1996,18 +2008,20 @@ export default function App() {
                       rel="noreferrer" 
                       className="text-[10px] text-indigo-600 hover:underline inline-flex items-center gap-0.5"
                     >
-                      Ücretsiz Al <ExternalLink className="w-2.5 h-2.5" />
+                      {lang === 'en' ? 'Get Free Key' : 'Ücretsiz Al'} <ExternalLink className="w-2.5 h-2.5" />
                     </a>
                   </div>
                   <input
                     type="password"
                     value={inputApiKey}
                     onChange={(e) => setInputApiKey(e.target.value)}
-                    placeholder={customApiKey ? "••••••••••••••••" : "gsk_..."}
+                    placeholder={customApiKey ? "••••••••••••••••" : t.apiKeyPlaceholder}
                     className="w-full px-3.5 py-2.5 border border-neutral-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-neutral-900 font-mono"
                   />
                   <p className="text-[10.5px] text-neutral-400 leading-normal">
-                    İsteğe bağlıdır. Boş bırakırsanız sistemin varsayılan ücretsiz kotası kullanılır. Kendi ücretsiz anahtarınızı girerek kesintisiz ve yüksek limitli üretim yapabilirsiniz.
+                    {lang === 'en' 
+                      ? 'Optional. If left blank, the shared quota is utilized. Provide your free Groq key for uncapped, high-velocity generations.'
+                      : 'İsteğe bağlıdır. Boş bırakırsanız sistemin varsayılan ücretsiz kotası kullanılır. Kendi ücretsiz anahtarınızı girerek kesintisiz ve yüksek limitli üretim yapabilirsiniz.'}
                   </p>
                 </div>
 
@@ -2017,13 +2031,13 @@ export default function App() {
                     onClick={() => setShowAuthModal(false)}
                     className="flex-1 py-2 border border-neutral-200 rounded-xl text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
                   >
-                    Vazgeç
+                    {t.cancelBtn}
                   </button>
                   <button
                     type="submit"
                     className="flex-1 py-2 bg-neutral-900 text-white rounded-xl text-xs font-semibold hover:bg-neutral-800"
                   >
-                    Ayarları Kaydet
+                    {t.saveSettingsBtn}
                   </button>
                 </div>
               </form>
@@ -2037,23 +2051,23 @@ export default function App() {
             <div className="bg-white rounded-2xl p-6 max-w-2xl w-full shadow-2xl border border-neutral-200 max-h-[80vh] flex flex-col">
               <div className="flex items-center justify-between border-b border-neutral-200 pb-3 mb-4">
                 <div>
-                  <h3 className="text-lg font-bold text-neutral-900">Kayıtlı Projeler & Geçmiş</h3>
-                  <p className="text-xs text-neutral-500">Önceki ürettiğiniz uygulamalar, AI sohbetleri ve ZIP exportları.</p>
+                  <h3 className="text-lg font-bold text-neutral-900">{t.historyModalTitle}</h3>
+                  <p className="text-xs text-neutral-500">{t.historyModalDesc}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   {savedProjects.length > 0 && (
                     <button
                       onClick={copyAllProjectsSummary}
-                      className="px-2.5 py-1 bg-neutral-900 text-white rounded-lg text-xs font-semibold hover:bg-neutral-800 transition-colors flex items-center gap-1.5 shadow-xs"
-                      title="Tüm projelerin başlık ve açıklamalarını kopyala"
+                      className="px-2.5 py-1 bg-neutral-900 text-white rounded-lg text-xs font-semibold hover:bg-neutral-800 transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
+                      title={lang === 'en' ? 'Copy all project summaries as text' : 'Tüm projelerin başlık ve açıklamalarını kopyala'}
                     >
                       <Copy className="w-3 h-3" />
-                      <span>Tümünü Metin Olarak Kopyala</span>
+                      <span>{lang === 'en' ? 'Copy All as Text' : 'Tümünü Metin Olarak Kopyala'}</span>
                     </button>
                   )}
                   <button
                     onClick={() => setShowHistoryModal(false)}
-                    className="text-neutral-400 hover:text-neutral-900 text-sm font-bold p-1 ml-1"
+                    className="text-neutral-400 hover:text-neutral-900 text-sm font-bold p-1 ml-1 cursor-pointer"
                   >
                     ✕
                   </button>
@@ -2063,7 +2077,7 @@ export default function App() {
               <div className="flex-1 overflow-y-auto space-y-3">
                 {savedProjects.length === 0 ? (
                   <div className="text-center py-12 text-neutral-400 text-xs">
-                    Henüz kaydedilmiş bir proje bulunmuyor. Yeni bir fikir inşa ettiğinizde burada listelenecektir.
+                    {t.noProjectsYet}
                   </div>
                 ) : (
                   savedProjects.map((p) => (
