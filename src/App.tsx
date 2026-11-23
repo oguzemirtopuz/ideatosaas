@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import JSZip from 'jszip';
+import { translations, Language } from './i18n/translations';
 import { 
   Lightbulb, Loader2, Target, Zap, Clock, Code, DollarSign, 
   CheckCircle2, AlertTriangle, FileText, ArrowRight, ArrowLeft, 
   Layers, Hammer, Eye, Play, Sparkles, Check, Download, ExternalLink,
   TrendingUp, BarChart3, Users, Archive, Send, MessageSquare, 
   UserCheck, History, Trash2, FolderGit2, RefreshCw, Key, Settings, Copy,
-  Sun, Moon
+  Sun, Moon, Globe
 } from 'lucide-react';
 
 interface IdeaScore {
@@ -125,6 +126,24 @@ export default function App() {
     }
   });
   const [showHistoryModal, setShowHistoryModal] = useState<boolean>(false);
+
+  // Çoklu Dil (TR / EN)
+  const [lang, setLang] = useState<Language>(() => {
+    try {
+      const saved = localStorage.getItem('ideatosaas_lang');
+      if (saved === 'en' || saved === 'tr') return saved;
+    } catch {}
+    return 'tr';
+  });
+  const t = translations[lang];
+
+  const toggleLanguage = () => {
+    const nextLang: Language = lang === 'tr' ? 'en' : 'tr';
+    setLang(nextLang);
+    try {
+      localStorage.setItem('ideatosaas_lang', nextLang);
+    } catch {}
+  };
 
   // Aşama 1: Fikir Motoru
   const [ideas, setIdeas] = useState<Idea[]>([]);
@@ -273,7 +292,8 @@ export default function App() {
       const effectiveKey = getEffectiveApiKey();
       const body = {
         customIdea: customIdea.trim() || undefined,
-        customApiKey: effectiveKey || undefined
+        customApiKey: effectiveKey || undefined,
+        lang
       };
       const response = await fetch('/api/generate-ideas', { 
         method: 'POST',
@@ -321,7 +341,7 @@ export default function App() {
       const res = await fetch('/api/generate-spec', {
         method: 'POST',
         headers: getApiHeaders(),
-        body: JSON.stringify({ idea, customApiKey: getEffectiveApiKey() || undefined })
+        body: JSON.stringify({ idea, customApiKey: getEffectiveApiKey() || undefined, lang })
       });
       const data = await res.json();
       checkQuotaExceeded(data, res.status);
@@ -344,7 +364,7 @@ export default function App() {
       const res = await fetch('/api/build-app', {
         method: 'POST',
         headers: getApiHeaders(),
-        body: JSON.stringify({ idea: selectedIdea, spec, customApiKey: getEffectiveApiKey() || undefined })
+        body: JSON.stringify({ idea: selectedIdea, spec, customApiKey: getEffectiveApiKey() || undefined, lang })
       });
       const data = await res.json();
       checkQuotaExceeded(data, res.status);
@@ -503,7 +523,7 @@ export default function App() {
       const res = await fetch('/api/generate-marketing-decision', {
         method: 'POST',
         headers: getApiHeaders(),
-        body: JSON.stringify({ idea: selectedIdea, spec, customApiKey: getEffectiveApiKey() || undefined })
+        body: JSON.stringify({ idea: selectedIdea, spec, customApiKey: getEffectiveApiKey() || undefined, lang })
       });
       const data = await res.json();
       checkQuotaExceeded(data, res.status);
@@ -1092,13 +1112,24 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* TR / EN Dil Seçici */}
+            <button
+              onClick={toggleLanguage}
+              title={lang === 'tr' ? 'Switch to English' : 'Türkçe Dilini Seç'}
+              className="inline-flex items-center justify-center px-3 py-1.5 bg-neutral-900 border border-neutral-700/80 rounded-lg text-xs font-mono font-semibold tracking-wider text-neutral-300 hover:text-white hover:border-neutral-500 transition-all shadow-sm active:scale-95 cursor-pointer"
+            >
+              <span className={lang === 'tr' ? 'text-emerald-400 font-bold' : 'text-neutral-500'}>TR</span>
+              <span className="mx-1 text-neutral-600">/</span>
+              <span className={lang === 'en' ? 'text-emerald-400 font-bold' : 'text-neutral-500'}>EN</span>
+            </button>
+
             {/* Proje Geçmişi Butonu */}
             <button
               onClick={() => setShowHistoryModal(true)}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-neutral-200 rounded-lg text-xs font-semibold text-neutral-700 hover:bg-neutral-50 transition-colors shadow-sm"
             >
               <History className="w-3.5 h-3.5 text-neutral-600" />
-              Kayıtlı Projeler ({savedProjects.length})
+              {t.historyBtn} ({savedProjects.length})
             </button>
 
             {/* Kullanıcı Giriş / Hesap ve Ayarlar */}
@@ -1676,11 +1707,11 @@ export default function App() {
           /* ========================================================================= */
           <div>
             <header className="mb-10 text-center space-y-4">
-              <h2 className="text-4xl font-bold tracking-tight text-neutral-900">
-                Fikir Motoru
+              <h2 className="text-4xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
+                {t.stage1Title}
               </h2>
               <p className="text-base text-neutral-500 max-w-2xl mx-auto">
-                Canlı startup sinyallerini tarar, sıfır maliyetle 1 günde kurulabilecek mikro-SaaS fırsatlarını tespit eder.
+                {t.stage1Desc}
               </p>
               
               <button 
@@ -1693,18 +1724,18 @@ export default function App() {
                 ) : (
                   <Lightbulb className="w-4 h-4" />
                 )}
-                {loading && !customIdea.trim() ? 'Sinyaller Taranıyor...' : 'Yeni Fikirler Üret (3 Adet)'}
+                {loading && !customIdea.trim() ? t.generatingIdeasTitle : t.generateIdeasBtn}
               </button>
 
               <div className="mt-6 max-w-2xl mx-auto">
                 <div className="bg-white border border-neutral-200 rounded-2xl p-4 shadow-sm text-left">
                   <h3 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-2">
-                    veya kendi fikrini yaz (Fikir to App)
+                    {lang === 'en' ? 'Or define custom concept (Idea to App)' : 'veya kendi fikrini yaz (Fikir to App)'}
                   </h3>
                   <textarea
                     value={customIdea}
                     onChange={(e) => setCustomIdea(e.target.value)}
-                    placeholder="Örn: Küçük işletmeler için randevu takip aracı veya hayvan kilo takip uygulaması..."
+                    placeholder={t.customIdeaPlaceholder}
                     className="w-full h-20 px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent resize-none"
                     disabled={loading}
                   />
@@ -1718,7 +1749,7 @@ export default function App() {
                     ) : (
                       <Zap className="w-4 h-4" />
                     )}
-                    {loading && customIdea.trim() ? 'Fikir Analiz Ediliyor...' : 'Bu Fikri Analiz Et'}
+                    {loading && customIdea.trim() ? t.generatingIdeasTitle : t.customIdeaBtn}
                   </button>
                 </div>
               </div>
@@ -1784,10 +1815,10 @@ export default function App() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <h4 className="text-xs font-bold text-neutral-900 dark:text-neutral-100 uppercase tracking-wider">
-                        Yatırımcı & Hakem Tavsiyesi
+                        {t.judgeBoxTitle}
                       </h4>
                       <span className="text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-bold px-2 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-800">
-                        Canlı Eleme
+                        {t.judgeBoxBadge}
                       </span>
                     </div>
                     <p className="text-sm text-neutral-800 dark:text-neutral-200 leading-relaxed font-medium">
@@ -1809,15 +1840,15 @@ export default function App() {
                         <div className="mb-1.5">
                           {idea.verdict === 'high_potential' ? (
                             <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300 px-2.5 py-0.5 rounded-full text-[11px] font-bold border border-emerald-300 dark:border-emerald-800">
-                              🟢 Yüksek Potansiyel
+                              {t.badgeHighPotential}
                             </span>
                           ) : idea.verdict === 'trap' ? (
                             <span className="inline-flex items-center gap-1 bg-rose-50 text-rose-700 dark:bg-rose-950/70 dark:text-rose-300 px-2.5 py-0.5 rounded-full text-[11px] font-bold border border-rose-300 dark:border-rose-800">
-                              🔴 Tuzak / Zor Pazar
+                              {t.badgeTrap}
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 dark:bg-amber-950/70 dark:text-amber-300 px-2.5 py-0.5 rounded-full text-[11px] font-bold border border-amber-300 dark:border-amber-800">
-                              🟡 Niş Fırsat
+                              {t.badgeNiche}
                             </span>
                           )}
                         </div>
@@ -1841,7 +1872,7 @@ export default function App() {
                         : 'bg-amber-50/80 border-amber-200 text-amber-900 dark:bg-amber-950/40 dark:border-amber-800/60 dark:text-amber-200'
                     }`}>
                       <div className="font-bold text-[10px] uppercase tracking-wider mb-0.5 opacity-80">
-                        Hakem Değerlendirmesi
+                        {t.judgeEvaluationLabel}
                       </div>
                       <div className="leading-relaxed font-medium">
                         {idea.verdictReason}
@@ -1851,20 +1882,20 @@ export default function App() {
                   
                   <div className="space-y-4 flex-1">
                     <div>
-                      <h4 className="text-[11px] font-semibold text-neutral-400 uppercase tracking-wider mb-1">Problem</h4>
+                      <h4 className="text-[11px] font-semibold text-neutral-400 uppercase tracking-wider mb-1">{t.problemLabel}</h4>
                       <p className="text-sm text-neutral-700 leading-relaxed">{idea.problem}</p>
                     </div>
                     
                     <div className="grid grid-cols-2 gap-3 text-xs">
                       <div>
                         <h4 className="font-semibold text-neutral-400 uppercase tracking-wider mb-1 flex items-center gap-1">
-                          <Target className="w-3 h-3" /> Hedef
+                          <Target className="w-3 h-3" /> {t.targetLabel}
                         </h4>
                         <p className="text-neutral-700">{idea.targetUser}</p>
                       </div>
                       <div>
                         <h4 className="font-semibold text-neutral-400 uppercase tracking-wider mb-1 flex items-center gap-1">
-                          <Clock className="w-3 h-3" /> Neden Şimdi
+                          <Clock className="w-3 h-3" /> {t.whyNowLabel}
                         </h4>
                         <p className="text-neutral-700">{idea.whyNow}</p>
                       </div>
@@ -1872,7 +1903,7 @@ export default function App() {
 
                     <div>
                       <h4 className="text-[11px] font-semibold text-neutral-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                        <Code className="w-3 h-3" /> MVP Kapsamı (v1)
+                        <Code className="w-3 h-3" /> {t.mvpScopeLabel}
                       </h4>
                       <ul className="space-y-1">
                         {idea.mvpScope.map((scope, i) => (
@@ -1887,19 +1918,19 @@ export default function App() {
                     <div className="pt-3 border-t border-neutral-100">
                       <div className="grid grid-cols-4 gap-1.5 text-center mb-2">
                         <div className="bg-neutral-50 p-1.5 rounded-lg">
-                          <div className="text-[10px] text-neutral-500 mb-0.5">Acı</div>
+                          <div className="text-[10px] text-neutral-500 mb-0.5">{t.scorePain}</div>
                           <div className="font-bold text-xs text-neutral-900">{idea.scores.pain}</div>
                         </div>
                         <div className="bg-neutral-50 p-1.5 rounded-lg">
-                          <div className="text-[10px] text-neutral-500 mb-0.5">Boşluk</div>
+                          <div className="text-[10px] text-neutral-500 mb-0.5">{t.scoreLack}</div>
                           <div className="font-bold text-xs text-neutral-900">{idea.scores.lackOfSolutions}</div>
                         </div>
                         <div className="bg-neutral-50 p-1.5 rounded-lg">
-                          <div className="text-[10px] text-neutral-500 mb-0.5">Hız</div>
+                          <div className="text-[10px] text-neutral-500 mb-0.5">{t.scoreSpeed}</div>
                           <div className="font-bold text-xs text-neutral-900">{idea.scores.feasibility}</div>
                         </div>
                         <div className="bg-neutral-50 p-1.5 rounded-lg">
-                          <div className="text-[10px] text-neutral-500 mb-0.5"><DollarSign className="w-2.5 h-2.5 inline" /></div>
+                          <div className="text-[10px] text-neutral-500 mb-0.5">{t.scoreMonetization}</div>
                           <div className="font-bold text-xs text-neutral-900">{idea.scores.monetization}</div>
                         </div>
                       </div>
@@ -1914,7 +1945,7 @@ export default function App() {
                       onClick={() => handleSelectIdea(idea)}
                       className="w-full py-2.5 bg-neutral-900 text-white font-medium rounded-xl hover:bg-neutral-800 transition-colors text-xs flex items-center justify-center gap-1.5 shadow-sm"
                     >
-                      Bununla Devam Et (Aşama 2) <ArrowRight className="w-3.5 h-3.5" />
+                      {t.selectIdeaBtn} <ArrowRight className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>

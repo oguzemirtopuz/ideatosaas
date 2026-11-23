@@ -172,7 +172,63 @@ function getFallbackSignals(): { reddit: string[]; trends: string[] } {
 }
 
 // Gerçekçi ve pazar trendine uygun acil durum SaaS fikirleri
-function getRealisticFallbackIdeas(): any[] {
+function getRealisticFallbackIdeas(lang: string = "tr"): any[] {
+  if (lang === "en") {
+    return [
+      {
+        title: "ReviewPulse",
+        problem: "SMBs and SaaS founders struggle to monitor user reviews across Google, Trustpilot, and App Store, failing to respond immediately to negative feedback.",
+        targetUser: "Indie hackers, e-commerce merchants, and local business owners",
+        alternatives: "Expensive enterprise reputation suites ($150+/mo)",
+        whyNow: "AI-driven sentiment analysis and instant response drafting can now be performed at near-zero marginal cost.",
+        mvpScope: [
+          "Aggregated live review inbox from multi-channel sources",
+          "Real-time webhook and email alerts for 1-star reviews",
+          "One-click AI empathetic response draft generator"
+        ],
+        feasibilityNote: "Can be scaffolded in 1 day using React, Tailwind, and Supabase free tier.",
+        scores: { pain: 9, lackOfSolutions: 8, feasibility: 9, monetization: 8 },
+        totalScore: 34,
+        verdict: "high_potential",
+        verdictReason: "Prevents customer churn directly. B2B businesses eagerly pay $29-$49/mo for instant reputation protection."
+      },
+      {
+        title: "FormToLead",
+        problem: "Frontend developers want form handling on static landing pages (Astro, Next.js, HTML) without spinning up custom backends, while existing form APIs are heavily paywalled.",
+        targetUser: "Frontend developers, no-code agencies, and indie founders",
+        alternatives: "Formspree, Typeform (restrictive free tiers)",
+        whyNow: "Static-site workflows and serverless micro-backends are at all-time high adoption.",
+        mvpScope: [
+          "Single-endpoint JSON form submission capture",
+          "Instant Telegram/Email lead forwarding webhook",
+          "Clean web dashboard with CSV/Excel export"
+        ],
+        feasibilityNote: "Vercel serverless functions + free Postgres tier with zero baseline infrastructure cost.",
+        scores: { pain: 8, lackOfSolutions: 7, feasibility: 10, monetization: 7 },
+        totalScore: 32,
+        verdict: "high_potential",
+        verdictReason: "Solves an acute developer obstacle. Profitable from day one with near-zero operating costs."
+      },
+      {
+        title: "ChangelogHero",
+        problem: "Software teams frequently delay or neglect drafting user-facing release notes from technical commit logs.",
+        targetUser: "SaaS founders, PMs, and open-source library authors",
+        alternatives: "Beamer, Canny (bloated and overpriced for small teams)",
+        whyNow: "Summarizing Git commit messages into polished release notes with LLMs is now trivial.",
+        mvpScope: [
+          "GitHub webhook to automatically parse commits and PRs",
+          "One-click hosted public changelog page",
+          "Embeddable widget script for existing customer dashboards"
+        ],
+        feasibilityNote: "Built rapidly via GitHub API and serverless SSR in hours.",
+        scores: { pain: 7, lackOfSolutions: 8, feasibility: 9, monetization: 8 },
+        totalScore: 32,
+        verdict: "niche",
+        verdictReason: "A slick utility for developers; solid retention but a narrower market than direct B2B sales automation."
+      }
+    ];
+  }
+
   return [
     {
       title: "ReviewPulse",
@@ -231,13 +287,16 @@ function getRealisticFallbackIdeas(): any[] {
 // Ana fikir uretme handler'i
 export async function generateIdeasHandler(req: Request, res: Response) {
   try {
+    const lang = req.body?.lang === "en" ? "en" : "tr";
     const apiKey = (req.headers['x-groq-api-key'] as string) || req.body?.customApiKey || process.env.GROQ_API_KEY;
     if (!apiKey) {
       console.warn("GROQ_API_KEY ayarlanmamış, doğrulanmış pazar SaaS fikirleri devreye alınıyor.");
       res.json({
-        ideas: getRealisticFallbackIdeas(),
+        ideas: getRealisticFallbackIdeas(lang),
         warnings: [
-          "GROQ_API_KEY is not configured. Fallback SaaS ideas loaded. You can provide your own free Groq API key in Settings."
+          lang === "en" 
+            ? "GROQ_API_KEY is not configured. Fallback SaaS ideas loaded. You can provide your own free Groq API key in Settings."
+            : "GROQ_API_KEY ayarlanmamış, doğrulanmış pazar SaaS fikirleri yüklendi. Ayarlar bölümünden kendi ücretsiz anahtarınızı girebilirsiniz."
         ],
         isQuotaExceeded: true,
         rawSignals: { reddit: [], trends: [] },
@@ -259,10 +318,10 @@ export async function generateIdeasHandler(req: Request, res: Response) {
       trendData = trendRes.data;
 
       if (!redditRes.success || redditData.length === 0) {
-        warnings.push(`Pazar sinyali verisi alınamadı (${redditRes.error || "kaynak yanıt vermedi"})`);
+        warnings.push(lang === "en" ? `Market signals could not be fetched (${redditRes.error || "no response"})` : `Pazar sinyali verisi alınamadı (${redditRes.error || "kaynak yanıt vermedi"})`);
       }
       if (!trendRes.success || trendData.length === 0) {
-        warnings.push(`Trend verisi alınamadı (${trendRes.error || "kaynak yanıt vermedi"})`);
+        warnings.push(lang === "en" ? `Search trend data unavailable (${trendRes.error || "no response"})` : `Trend verisi alınamadı (${trendRes.error || "kaynak yanıt vermedi"})`);
       }
 
       // Hic veri yoksa yedek sinyalleri kullan
@@ -271,7 +330,9 @@ export async function generateIdeasHandler(req: Request, res: Response) {
         redditData = fallback.reddit;
         trendData = fallback.trends;
         warnings.push(
-          "Canli veri kaynaklari erisilemedi, guncel pazar trendleri ve bilinen sikayetler kullanildi."
+          lang === "en"
+            ? "Live sources unreachable; loaded curated market telemetry and pain signals."
+            : "Canli veri kaynaklari erisilemedi, guncel pazar trendleri ve bilinen sikayetler kullanildi."
         );
       }
     }
@@ -281,7 +342,39 @@ export async function generateIdeasHandler(req: Request, res: Response) {
     let prompt: string;
 
     if (customIdea) {
-      prompt = `Sen kıdemli bir startup kurucusu ve full-stack mimarsın. Kullanıcı şu fikri/ihtiyacı paylaştı:
+      prompt = lang === "en"
+        ? `You are a seasoned startup founder and full-stack architect. The user shared this product concept:
+"${customIdea}"
+
+Analyze this concept and detail it as a concrete, high-margin Micro-SaaS that can be shipped in 1 day with zero infrastructure cost (React, Supabase free tier, Vercel free tier). Give it a catchy, creative, unique brand name. All text MUST be in English.
+
+Criteria (1-10 points):
+1. Pain intensity (pain)
+2. Lack of existing good solutions (lackOfSolutions)
+3. Technical feasibility - 1-day ship (feasibility)
+4. Monetization signal (monetization)
+
+Strict Rules:
+- verdict: "high_potential" | "niche" | "trap"
+- verdictReason: 1-2 sentence candid investor reality check explaining why to build or avoid.
+
+Return STRICTLY a valid JSON array with 1 item:
+[
+  {
+    "title": "Creative SaaS Brand",
+    "problem": "Realistic problem statement (2-3 sentences)",
+    "targetUser": "Precise ICP target",
+    "alternatives": "Existing alternatives and shortcomings",
+    "whyNow": "Why build now",
+    "mvpScope": ["1. Core MVP feature", "2. Core MVP feature", "3. Core MVP feature"],
+    "feasibilityNote": "Zero-cost 1-day execution note",
+    "scores": { "pain": 8, "lackOfSolutions": 7, "feasibility": 9, "monetization": 7 },
+    "totalScore": 31,
+    "verdict": "high_potential",
+    "verdictReason": "Clear B2B ROI with straightforward immediate implementation."
+  }
+]`
+        : `Sen kıdemli bir startup kurucusu ve full-stack mimarsın. Kullanıcı şu fikri/ihtiyacı paylaştı:
 "${customIdea}"
 
 Bu fikri analiz et ve sıfır maliyetle (React, Supabase free tier, Vercel free tier) 1 günde kurulabilecek somut bir Mikro-SaaS olarak detaylandır. Fikre yaratıcı, akılda kalıcı, özgün bir SaaS ürün adı ver (Asla 'Application Name' veya 'Uygulama Adı' gibi jenerik kalıplar yazma!).
@@ -313,7 +406,49 @@ Yanıtını KESİNLİKLE sadece aşağıdaki şemaya sahip tek elemanlı bir JSO
   }
 ]`;
     } else {
-      prompt = `Sen kıdemli bir startup kurucusu, solo kurucu mentoru ve full-stack mimarsın.
+      prompt = lang === "en"
+        ? `You are a seasoned startup founder, solo founder mentor, and full-stack architect.
+Your mission is to analyze real-time market signals below and synthesize EXACTLY 3 DISTINCT, HIGH-CONVERTING, ZERO-COST (React/Tailwind, Supabase free tier, Vercel free tier) 1-Day Micro-SaaS ideas. All text MUST be in English.
+
+Live Developer Discussions / Pain Points: ${JSON.stringify(redditData.slice(0, 10))}
+Search Trends: ${JSON.stringify(trendData.slice(0, 10))}
+
+🚫 STRICT NEGATIVE FILTERS (BLACKLIST - NEVER GENERATE THESE):
+1. Cybersecurity, SIEM, autonomous defense, or antivirus tools are STRICTLY FORBIDDEN (impossible for a solo builder in 1 day).
+2. Pure log converters, timestamp formatters, or trivial calculators are FORBIDDEN (zero willingness to pay).
+3. Calendar/scheduling tools are FORBIDDEN (monopolized by Calendly/Cal.com; sync overhead is brutal).
+4. Invoicing, accounting, or tax compliance tools are FORBIDDEN (onerous legal/jurisdiction hurdles).
+
+✅ MANDATORY HIGH-CONVERSION NICHES:
+1. High-velocity B2B Sales / Lead / Speed-to-lead response automation.
+2. Developer tools & context synchronizers for engineers coding with AI assistants (Cursor, Claude Code, Windsurf).
+3. Operational automation utilities that save SMBs hundreds of manual hours.
+
+RULES:
+1. Never use generic placeholders like 'Brand Name 1', 'App Name', or 'Application 1'. Give them memorable SaaS titles.
+2. Problem descriptions must be compelling and real (2-3 sentences).
+3. mvpScope must contain 3 realistic, shippable v1 bullet points.
+4. verdict: "high_potential" | "niche" | "trap"
+5. verdictReason: 1-2 sentences of candid, brutal investor reality check.
+6. Output MUST strictly be a JSON array starting with '[' and ending with ']'.
+
+JSON Schema:
+[
+  {
+    "title": "SaaS Name",
+    "problem": "Realistic acute pain statement",
+    "targetUser": "Target ICP customer persona",
+    "alternatives": "Existing alternatives and their flaws",
+    "whyNow": "Why build right now",
+    "mvpScope": ["1. Concrete MVP capability", "2. Concrete MVP capability", "3. Concrete MVP capability"],
+    "feasibilityNote": "Zero-cost architecture note",
+    "scores": { "pain": 8, "lackOfSolutions": 7, "feasibility": 9, "monetization": 7 },
+    "totalScore": 31,
+    "verdict": "high_potential",
+    "verdictReason": "Delivers immediate ROI to B2B customers, 1-day shippable MVP."
+  }
+]`
+        : `Sen kıdemli bir startup kurucusu, solo kurucu mentoru ve full-stack mimarsın.
 Görevin, aşağıdaki gerçek piyasa sinyallerini analiz ederek sıfır maliyetle (React/Tailwind, Supabase free tier, Vercel free tier) 1 günde kurulabilecek TAM 3 ADET FARKLI, ÖZGÜN, YÜKSEK MONETİZASYON POTANSİYELİNE SAHİP Mikro-SaaS fikri üretmektir.
 
 Reddit Şikayetleri/Talepleri: ${JSON.stringify(redditData.slice(0, 10))}
@@ -451,11 +586,11 @@ JSON Şeması:
     let finalIdeas = validIdeas;
     if (!finalIdeas || finalIdeas.length === 0) {
       console.warn("AI modelleri geçerli özgün fikir üretemedi, pazar trendine uygun acil durum fikirleri devreye alınıyor.");
-      finalIdeas = getRealisticFallbackIdeas();
+      finalIdeas = getRealisticFallbackIdeas(lang);
       warnings.push(
         isQuotaError 
-          ? "AI rate limit or quota exceeded. Default verified SaaS ideas loaded."
-          : "Yapay zeka modelleri yoğunluk nedeniyle geçici olarak yanıt veremedi; güncel pazar sinyalleriyle doğrulanmış gerçek SaaS fikirleri yüklendi."
+          ? (lang === "en" ? "AI rate limit or quota exceeded. Default verified SaaS ideas loaded." : "AI kotası aşıldı. Doğrulanmış pazar SaaS fikirleri yüklendi.")
+          : (lang === "en" ? "AI models temporarily occupied; loaded verified real-market SaaS ideas." : "Yapay zeka modelleri yoğunluk nedeniyle geçici olarak yanıt veremedi; güncel pazar sinyalleriyle doğrulanmış gerçek SaaS fikirleri yüklendi.")
       );
     }
 
@@ -469,7 +604,11 @@ JSON Şeması:
       });
       const best = sorted[0];
       const others = sorted.slice(1).map((i: any) => i.title).join(", ");
-      judgeRecommendation = `💡 Bu turun en güçlü adayı: "${best.title}". ${best.verdictReason || best.problem} ${others ? `(Diğer alternatifler: ${others}.)` : ''}`;
+      if (lang === "en") {
+        judgeRecommendation = `💡 Top pick for this round: "${best.title}". ${best.verdictReason || best.problem} ${others ? `(Compared to alternatives like ${others}, this holds the highest immediate monetization probability.)` : ''}`;
+      } else {
+        judgeRecommendation = `💡 Bu turun en güçlü adayı: "${best.title}". ${best.verdictReason || best.problem} ${others ? `(Diğer alternatifler: ${others}.)` : ''}`;
+      }
     }
 
     res.json({

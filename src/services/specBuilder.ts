@@ -5,15 +5,44 @@ import Groq from "groq-sdk";
 export async function generateSpecHandler(req: Request, res: Response) {
   try {
     const { idea } = req.body;
+    const lang = req.body?.lang === "en" ? "en" : "tr";
     if (!idea || !idea.title) {
-      res.status(400).json({ error: "Geçerli bir fikir nesnesi gerekli." });
+      res.status(400).json({ error: lang === "en" ? "Valid idea object required." : "Geçerli bir fikir nesnesi gerekli." });
       return;
     }
 
     const apiKey = (req.headers['x-groq-api-key'] as string) || req.body?.customApiKey || process.env.GROQ_API_KEY;
     if (!apiKey) {
       console.warn("GROQ_API_KEY bulunamadı, akıllı yedek şartname (spec) oluşturuluyor.");
-      const fallbackSpec = {
+      const fallbackSpec = lang === "en" ? {
+        title: idea.title,
+        tagline: `${idea.title} - Zero-cost rapid, practical micro-SaaS solution`,
+        userFlows: [
+          "Step 1: User signs in and lands on dashboard overview",
+          "Step 2: User connects source or submits initial form data",
+          "Step 3: User monitors live telemetry, metrics, and KPI graphs",
+          "Step 4: User configures webhooks or exports data report"
+        ],
+        dataModel: [
+          { table: "users", description: "User credentials and organization profile" },
+          { table: "records", description: `${idea.title} operational records and timestamp` }
+        ],
+        screens: [
+          "1. Onboarding & Welcome Hub",
+          "2. Data Capture & Form Configuration",
+          "3. Analytics Dashboard & KPI Summary"
+        ],
+        outOfScope: [
+          "Enterprise multi-tenancy & granular RBAC",
+          "Paid enterprise integrations"
+        ],
+        buildChecklist: [
+          "Step 1: Layout skeleton & navigation bar",
+          "Step 2: Reactive form & state ingestion",
+          "Step 3: KPI cards & dynamic visualization",
+          "Step 4: Export to CSV and validation"
+        ]
+      } : {
         title: idea.title,
         tagline: `${idea.title} - Sıfır maliyetle hızlı ve pratik mikro-SaaS çözümü`,
         userFlows: [
@@ -67,7 +96,46 @@ export async function generateSpecHandler(req: Request, res: Response) {
       ...activeModels.filter(m => !["llama-3.3-70b-versatile", "llama-3.1-70b-versatile", "deepseek-r1-distill-llama-70b", "llama-3.1-8b-instant"].includes(m))
     ];
 
-    const prompt = `Sen kıdemli bir full-stack mimar ve ürün yöneticisisin. 
+    const prompt = lang === "en" ? `You are a principal full-stack architect and technical product manager.
+Prepare a complete, production-ready technical product specification (SPEC) for the micro-SaaS concept below following "SPEC-FIRST" engineering principles. All text must be in English.
+Stack: React 18 / Next.js, Tailwind CSS, Supabase (Postgres & Auth), Vercel free tier, zero operating cost.
+
+Concept:
+Title: ${idea.title}
+Problem: ${idea.problem}
+Target User: ${idea.targetUser}
+MVP Scope: ${JSON.stringify(idea.mvpScope)}
+
+Respond STRICTLY with valid JSON (no markdown formatting or prose):
+{
+  "title": "${idea.title}",
+  "tagline": "Memorable, concise value proposition tagline",
+  "userFlows": [
+    "Step 1: User authenticates and lands on welcome hub",
+    "Step 2: User completes form / ingests initial data stream",
+    "Step 3: User reviews real-time dashboard analytics",
+    "Step 4: User exports report or triggers webhook action"
+  ],
+  "dataModel": [
+    { "table": "users", "description": "User profiles and credentials" },
+    { "table": "records", "description": "Primary transactional records and timestamps" }
+  ],
+  "screens": [
+    "1. Welcome & Onboarding View",
+    "2. Data Capture & Form Configuration",
+    "3. Central Analytics & KPI Dashboard"
+  ],
+  "outOfScope": [
+    "Enterprise team permissions & multi-org tenancy (deferred to v2)",
+    "Paid third-party enterprise integrations"
+  ],
+  "buildChecklist": [
+    "Step 1: Base UI scaffolding and navigation",
+    "Step 2: Reactive form and data capture pipeline",
+    "Step 3: KPI metrics and visual cards",
+    "Step 4: Data export and sanity checks"
+  ]
+}` : `Sen kıdemli bir full-stack mimar ve ürün yöneticisisin. 
 Aşağıda seçilen mikro-SaaS fikri için "Aşama 2: SPEC-FIRST" disiplinine uygun eksiksiz bir teknik şartname (SPEC) hazırla.
 Stack kuralı: Next.js/React, Tailwind CSS, Supabase (Postgres & Auth), Vercel free tier, sıfır maliyet.
 

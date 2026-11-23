@@ -5,15 +5,36 @@ import Groq from "groq-sdk";
 export async function generateMarketingAndDecisionHandler(req: Request, res: Response) {
   try {
     const { idea, spec } = req.body;
+    const lang = req.body?.lang === "en" ? "en" : "tr";
     if (!idea || !spec) {
-      res.status(400).json({ error: "Fikir ve Spec nesnesi gerekli." });
+      res.status(400).json({ error: lang === "en" ? "Idea and Spec objects required." : "Fikir ve Spec nesnesi gerekli." });
       return;
     }
 
     const apiKey = (req.headers['x-groq-api-key'] as string) || req.body?.customApiKey || process.env.GROQ_API_KEY;
     if (!apiKey) {
       console.warn("GROQ_API_KEY bulunamadı, akıllı yedek pazarlama stratejisi üretiliyor.");
-      const fallbackResult = {
+      const fallbackResult = lang === "en" ? {
+        channel: "Reddit Ads (r/SaaS, r/Entrepreneur, r/SideProject)",
+        adCopy: {
+          headline: `${idea.title} - ${idea.problem.substring(0, 50)}... Solved!`,
+          body: `Engineered for ${idea.targetUser} with zero infrastructure overhead. Start saving hours today.`,
+          callToAction: "Try For Free"
+        },
+        setupChecklist: [
+          "Step 1: Deploy landing page on Vercel / Netlify",
+          "Step 2: Setup Reddit / Twitter Ads conversion pixel",
+          "Step 3: Run 3-day $30 micro-budget validation experiment"
+        ],
+        simulation: {
+          testBudget: 30,
+          visitors: 380,
+          conversions: 32,
+          cac: 0.93,
+          decision: "PROCEED",
+          decisionNote: "CAC $0.93 is well within target range ($0.50 - $1.00). Keep scaling acquisition!"
+        }
+      } : {
         channel: "Reddit Ads (r/SaaS, r/Entrepreneur, r/SideProject)",
         adCopy: {
           headline: `${idea.title} - ${idea.problem.substring(0, 50)}... Artık Kolay!`,
@@ -57,7 +78,42 @@ export async function generateMarketingAndDecisionHandler(req: Request, res: Res
       ...activeModels.filter(m => !["llama-3.3-70b-versatile", "llama-3.1-70b-versatile", "llama-3.1-8b-instant"].includes(m))
     ];
 
-    const prompt = `Sen kıdemli bir büyüme pazarlamacısı (Growth Hacker) ve ürün yöneticisisin.
+    const prompt = lang === "en" ? `You are a principal growth hacker and product marketing lead.
+Design a high-converting go-to-market test and CAC unit economics decision engine for the micro-SaaS below. All text must be in English.
+
+Product Context:
+Title: ${idea.title}
+Problem: ${idea.problem}
+Target User: ${idea.targetUser}
+Tagline: ${spec.tagline || ""}
+
+RULES:
+1. Select the highest-leverage acquisition channel (Reddit Ads, X/Twitter Ads, or Google Search Ads).
+2. Design a lean $30 micro-budget experiment.
+3. Decision rule: CAC <= $1.00 -> "PROCEED", CAC > $1.00 -> "PIVOT".
+
+Respond STRICTLY with valid JSON (no markdown or prose):
+{
+  "channel": "Reddit Ads (r/SaaS, r/startups)",
+  "adCopy": {
+    "headline": "High-Converting Punchy Ad Headline",
+    "body": "Compelling 2-sentence hook targeted directly to ICP.",
+    "callToAction": "Try Free Today"
+  },
+  "setupChecklist": [
+    "Step 1: Embed free telemetry and conversion tracking",
+    "Step 2: Configure Reddit / Twitter ad campaign pixel",
+    "Step 3: Launch 3-day $10/day validation experiment"
+  ],
+  "simulation": {
+    "testBudget": 30,
+    "visitors": 450,
+    "conversions": 35,
+    "cac": 0.86,
+    "decision": "PROCEED",
+    "decisionNote": "Calculated CAC is $0.86, beating our $1.00 viability ceiling. Proceed with scaling!"
+  }
+}` : `Sen kıdemli bir büyüme pazarlamacısı (Growth Hacker) ve ürün yöneticisisin.
 Aşağıdaki mikro-SaaS için "AŞAMA 4: MARKETING TEST MOTORU" ve "AŞAMA 5: KARAR MOTORU" stratejisini hazırla.
 
 Ürün Bilgileri:
@@ -93,7 +149,7 @@ KESİNLİKLE AŞAĞIDAKİ JSON FORMATINDA DÖN (Markdown veya açıklama ekleme)
     "conversions": 35,
     "cac": 0.86,
     "decision": "DEVAM ET",
-    "decisionNote": "CAC $0.86 ile $0.50-$1.00 hedef aralığında! Erken ilgi güçlü, bütçe kademeli artırılabilir."
+    "decisionNote": "Hesaplanan CAC 0.86$ ile $1.00 sınırının altında, birim ekonomi karlı. İlerleyin!"
   }
 }`;
 
