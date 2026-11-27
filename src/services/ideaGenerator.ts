@@ -2,27 +2,38 @@ import { Request, Response } from "express";
 import googleTrends from "google-trends-api";
 import Groq from "groq-sdk";
 
+export interface SignalItem {
+  text: string;
+  url?: string;
+  source?: string;
+}
+
 // Veri kaynagi sonuc tipi
 interface FetchResult {
   success: boolean;
   source: string;
   data: string[];
+  items?: SignalItem[];
   error?: string;
 }
 
-// RSS (RSS 2.0 <item> ve Atom <entry>) yanitindan baslik ve icerik cikarma (XML parser gerektirmez)
-function extractTitlesFromRSS(xml: string): string[] {
-  const titles: string[] = [];
+// RSS (RSS 2.0 <item> ve Atom <entry>) yanitindan baslik, icerik ve link cikarma (XML parser gerektirmez)
+function extractSignalsFromRSS(xml: string, sourceName: string): SignalItem[] {
+  const signals: SignalItem[] = [];
   // Hem RSS 2.0 (<item>) hem de Atom (<entry>) bloklarini yakala
   const itemRegex = /<(?:item|entry)[\s\S]*?<\/(?:item|entry)>/gi;
   const titleRegex = /<title[^>]*>([\s\S]*?)<\/title>/i;
   const contentRegex = /<(?:content|summary|description)[^>]*>([\s\S]*?)<\/(?:content|summary|description)>/i;
+  const linkHrefRegex = /<link[^>]+href=["']([^"']+)["'][^>]*>/i;
+  const linkTextRegex = /<link[^>]*>([^<]+)<\/link>/i;
 
   let match;
   while ((match = itemRegex.exec(xml)) !== null) {
     const entry = match[0];
     const titleMatch = titleRegex.exec(entry);
     const contentMatch = contentRegex.exec(entry);
+    const linkHrefMatch = linkHrefRegex.exec(entry);
+    const linkTextMatch = linkTextRegex.exec(entry);
 
     if (titleMatch) {
       const title = titleMatch[1]
@@ -39,17 +50,25 @@ function extractTitlesFromRSS(xml: string): string[] {
           .substring(0, 150)
           .trim();
       }
+
+      const rawUrl = linkHrefMatch ? linkHrefMatch[1] : (linkTextMatch ? linkTextMatch[1].trim() : undefined);
+      const url = rawUrl && rawUrl.startsWith("http") ? rawUrl.replace(/&amp;/g, "&") : undefined;
+
       if (title) {
-        titles.push(snippet ? `${title} - ${snippet}` : title);
+        signals.push({
+          text: snippet ? `${title} - ${snippet}` : title,
+          url,
+          source: sourceName,
+        });
       }
     }
   }
-  return titles;
+  return signals;
 }
 
 // Canli startup, SaaS ve aci noktasi sinyallerini topla (Hacker News Algolia API + Dev.to + Reddit)
 async function fetchRedditSignals(): Promise<FetchResult> {
-  let allPosts: string[] = [];
+  let allItems: SignalItem[] = [];
   const errors: string[] = [];
 
   // 1. Hacker News resmi Algolia REST API (Engelsiz, hizli, JSON formatinda)
@@ -65,10 +84,14 @@ async function fetchRedditSignals(): Promise<FetchResult> {
         if (res.ok) {
           const json = await res.json();
           if (Array.isArray(json?.hits)) {
-            const titles = json.hits
-              .map((h: any) => h.title)
-              .filter((t: any) => typeof t === "string" && t.trim().length > 0);
-            allPosts = allPosts.concat(titles);
+            const hnItems: SignalItem[] = json.hits
+              .filter((h: any) => typeof h.title === "string" && h.title.trim().length > 0)
+              .map((h: any) => ({
+                text: h.title.trim(),
+                url: h.objectID ? `https://news.ycombinator.com/item?id=${h.objectID}` : h.url,
+                source: "HackerNews",
+              }));
+            allItems = allItems.concat(hnItems);
           }
         }
       } catch (err: any) {
@@ -98,9 +121,9 @@ async function fetchRedditSignals(): Promise<FetchResult> {
 
       if (res.ok) {
         const xml = await res.text();
-        const posts = extractTitlesFromRSS(xml);
+        const posts = extractSignalsFromRSS(xml, src.name);
         if (posts.length > 0) {
-          allPosts = allPosts.concat(posts.slice(0, 5));
+          allItems = allItems.concat(posts.slice(0, 5));
         }
       } else {
         errors.push(`${src.name}: HTTP ${res.status}`);
@@ -111,9 +134,10 @@ async function fetchRedditSignals(): Promise<FetchResult> {
   }
 
   return {
-    success: allPosts.length > 0,
+    success: allItems.length > 0,
     source: "market-signals",
-    data: allPosts,
+    data: allItems.map(i => i.text),
+    items: allItems,
     error: errors.length > 0 ? errors.join("; ") : undefined,
   };
 }
@@ -307,6 +331,7 @@ export async function generateIdeasHandler(req: Request, res: Response) {
     const customIdea = req.body?.customIdea;
 
     let redditData: string[] = [];
+    let signalItems: SignalItem[] = [];
     let trendData: string[] = [];
     const warnings: string[] = [];
 
@@ -315,6 +340,7 @@ export async function generateIdeasHandler(req: Request, res: Response) {
       const [redditRes, trendRes] = await Promise.all([fetchRedditSignals(), fetchTrends()]);
 
       redditData = redditRes.data;
+      signalItems = redditRes.items || [];
       trendData = trendRes.data;
 
       if (!redditRes.success || redditData.length === 0) {
@@ -406,11 +432,12 @@ Yanıtını KESİNLİKLE sadece aşağıdaki şemaya sahip tek elemanlı bir JSO
   }
 ]`;
     } else {
+      const indexedSignals = signalItems.slice(0, 10).map((s, idx) => `[${idx}] (${s.source || 'Signal'}): ${s.text}`);
       prompt = lang === "en"
         ? `You are a seasoned startup founder, solo founder mentor, and full-stack architect.
 Your mission is to analyze real-time market signals below and synthesize EXACTLY 3 DISTINCT, HIGH-CONVERTING, ZERO-COST (React/Tailwind, Supabase free tier, Vercel free tier) 1-Day Micro-SaaS ideas. All text MUST be in English.
 
-Live Developer Discussions / Pain Points: ${JSON.stringify(redditData.slice(0, 10))}
+Live Developer Discussions / Pain Points (indexed): ${JSON.stringify(indexedSignals.length > 0 ? indexedSignals : redditData.slice(0, 10))}
 Search Trends: ${JSON.stringify(trendData.slice(0, 10))}
 
 🚫 STRICT NEGATIVE FILTERS (BLACKLIST - NEVER GENERATE THESE):
@@ -430,7 +457,8 @@ RULES:
 3. mvpScope must contain 3 realistic, shippable v1 bullet points.
 4. verdict: "high_potential" | "niche" | "trap"
 5. verdictReason: 1-2 sentences of candid, brutal investor reality check.
-6. Output MUST strictly be a JSON array starting with '[' and ending with ']'.
+6. signalIndex: integer index [0..9] of the signal that inspired this idea (or 0 if general).
+7. Output MUST strictly be a JSON array starting with '[' and ending with ']'.
 
 JSON Schema:
 [
@@ -445,13 +473,14 @@ JSON Schema:
     "scores": { "pain": 8, "lackOfSolutions": 7, "feasibility": 9, "monetization": 7 },
     "totalScore": 31,
     "verdict": "high_potential",
-    "verdictReason": "Delivers immediate ROI to B2B customers, 1-day shippable MVP."
+    "verdictReason": "Delivers immediate ROI to B2B customers, 1-day shippable MVP.",
+    "signalIndex": 0
   }
 ]`
         : `Sen kıdemli bir startup kurucusu, solo kurucu mentoru ve full-stack mimarsın.
 Görevin, aşağıdaki gerçek piyasa sinyallerini analiz ederek sıfır maliyetle (React/Tailwind, Supabase free tier, Vercel free tier) 1 günde kurulabilecek TAM 3 ADET FARKLI, ÖZGÜN, YÜKSEK MONETİZASYON POTANSİYELİNE SAHİP Mikro-SaaS fikri üretmektir.
 
-Reddit Şikayetleri/Talepleri: ${JSON.stringify(redditData.slice(0, 10))}
+Reddit / HN Şikayetleri ve Talepleri (indeksli): ${JSON.stringify(indexedSignals.length > 0 ? indexedSignals : redditData.slice(0, 10))}
 Google Trends (Bugün): ${JSON.stringify(trendData.slice(0, 10))}
 
 🚫 KATI YASAKLAR (KARA LİSTE - BU FİKİRLERİ KESİNLİKLE ÜRETME):
@@ -471,7 +500,8 @@ Google Trends (Bugün): ${JSON.stringify(trendData.slice(0, 10))}
 3. mvpScope içinde 1 günde bitirilebilecek somut 3 ana özellik yaz. 'Feature 1', 'Özellik 1' gibi yer tutucular YASAKTIR.
 4. verdict alanı: "high_potential" | "niche" | "trap" değerlerinden biri olmalı.
 5. verdictReason: Fikrin para kazanma ve uygulanabilirlik potansiyelini özetleyen 1-2 cümlelik dürüst hakem yorumu olmalı.
-6. Çıktı KESİNLİKLE doğrudan '[' ile başlayıp ']' ile biten geçerli bir JSON dizisi olmalıdır.
+6. signalIndex: Bu fikre ilham veren sinyalin indeks numarası (0..9 arası tamsayı).
+7. Çıktı KESİNLİKLE doğrudan '[' ile başlayıp ']' ile biten geçerli bir JSON dizisi olmalıdır.
 
 JSON Şeması:
 [
@@ -486,7 +516,8 @@ JSON Şeması:
     "scores": { "pain": 8, "lackOfSolutions": 7, "feasibility": 9, "monetization": 7 },
     "totalScore": 31,
     "verdict": "high_potential",
-    "verdictReason": "B2B müşteriye doğrudan satış getirir, 1 günde MVP'si çıkarılabilir."
+    "verdictReason": "B2B müşteriye doğrudan satış getirir, 1 günde MVP'si çıkarılabilir.",
+    "signalIndex": 0
   }
 ]`;
     }
@@ -594,6 +625,22 @@ JSON Şeması:
       );
     }
 
+    // Sinyal linklerini uretilen fikirlere eslestir (Sniper GTM icin)
+    if (finalIdeas && finalIdeas.length > 0 && signalItems.length > 0 && !customIdea) {
+      finalIdeas = finalIdeas.map((idea: any, idx: number) => {
+        const sigIdx = typeof idea.signalIndex === "number" && signalItems[idea.signalIndex]
+          ? idea.signalIndex
+          : idx % signalItems.length;
+        const matchedSignal = signalItems[sigIdx];
+        return {
+          ...idea,
+          sourceUrl: matchedSignal?.url,
+          sourceTitle: matchedSignal?.text,
+          sourcePlatform: matchedSignal?.source,
+        };
+      });
+    }
+
     // Hakem tavsiyesi oluştur (Judge Recommendation - 4. Çözüm)
     let judgeRecommendation = "";
     if (finalIdeas && finalIdeas.length > 0) {
@@ -619,6 +666,7 @@ JSON Şeması:
       rawSignals: {
         reddit: redditData,
         trends: trendData,
+        signalItems,
       },
     });
   } catch (error: any) {

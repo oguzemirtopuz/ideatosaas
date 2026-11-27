@@ -125,6 +125,8 @@ export interface Translations {
   ideaSavedToast: string;
   ideaRemovedToast: string;
   ideaDismissedToast: string;
+  sniperGtmBtn: string;
+  sniperGtmCopied: string;
 
   // Uyarılar
   quotaWarningTitle: string;
@@ -258,6 +260,8 @@ export const translations: Record<Language, Translations> = {
     ideaSavedToast: "Fikir havuzuna kaydedildi!",
     ideaRemovedToast: "Fikir havuzundan çıkarıldı.",
     ideaDismissedToast: "Fikir kara listeye alındı ve bir daha önerilmeyecek.",
+    sniperGtmBtn: "💬 Kaynak Posta Yanıt Ver (5sn GTM)",
+    sniperGtmCopied: "Yanıt şablonu panoya kopyalandı! Açılan sekmede Ctrl+V yapıp gönderebilirsin.",
 
   // Uyarılar
     quotaWarningTitle: "Kota / API Uyarısı",
@@ -389,6 +393,8 @@ export const translations: Record<Language, Translations> = {
     ideaSavedToast: "Idea saved to vault!",
     ideaRemovedToast: "Idea removed from vault.",
     ideaDismissedToast: "Idea blacklisted and will not be suggested again.",
+    sniperGtmBtn: "💬 Reply to Source Thread (5s GTM)",
+    sniperGtmCopied: "Reply template copied to clipboard! Press Ctrl+V in the opened tab.",
 
   // Uyarılar
     quotaWarningTitle: "Quota / API Notice",

@@ -29,11 +29,21 @@ interface Idea {
   totalScore: number;
   verdict?: 'high_potential' | 'niche' | 'trap';
   verdictReason?: string;
+  sourceUrl?: string;
+  sourceTitle?: string;
+  sourcePlatform?: string;
+}
+
+interface SignalItem {
+  text: string;
+  url?: string;
+  source?: string;
 }
 
 interface RawSignals {
   reddit: string[];
   trends: string[];
+  signalItems?: SignalItem[];
 }
 
 interface AppSpec {
@@ -206,6 +216,26 @@ export default function App() {
     const norm = idea.title.toLowerCase().trim();
     setDismissedIdeas(prev => Array.from(new Set([...prev, norm])));
     setIdeas(prev => prev.filter(item => item.title.toLowerCase().trim() !== norm));
+  };
+
+  // Sniper GTM (5sn Yanıt + Kaynak Linki)
+  const [sniperToast, setSniperToast] = useState<string | null>(null);
+
+  const handleSniperGtm = (url: string, ideaTitle: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const repoSlug = ideaTitle.replace(/[^a-zA-Z0-9]/g, '');
+    const repoUrl = `https://github.com/oguzemirtopuz/${repoSlug}`;
+    const replyText = lang === 'en'
+      ? `Hey! I saw your post about this exact pain point. I'm a 15-year-old indie developer and actually built an open-source tool called ${ideaTitle} to solve it: ${repoUrl}\n\nWould love to hear your honest feedback!`
+      : `Merhaba! Bu konudaki paylaşımını gördüm. 15 yaşında bağımsız bir geliştiriciyim ve tam olarak bu sorunu çözmek için ${ideaTitle} adlı açık kaynaklı bir araç geliştirdim: ${repoUrl}\n\nGeri bildirimlerini duymak çok isterim!`;
+
+    try {
+      navigator.clipboard.writeText(replyText);
+      setSniperToast(t.sniperGtmCopied);
+      setTimeout(() => setSniperToast(null), 4500);
+    } catch {}
+
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   // Çoklu Dil (TR / EN)
@@ -2107,7 +2137,18 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="mt-5 pt-3 border-t border-neutral-100">
+                  <div className="mt-5 pt-3 border-t border-neutral-100 space-y-2">
+                    {idea.sourceUrl && (
+                      <button
+                        type="button"
+                        onClick={(e) => handleSniperGtm(idea.sourceUrl!, idea.title, e)}
+                        className="w-full py-2 px-3 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 font-semibold rounded-xl transition-colors text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                        title={idea.sourceTitle || idea.sourceUrl}
+                      >
+                        <span>{t.sniperGtmBtn}</span>
+                        <ExternalLink className="w-3 h-3 shrink-0" />
+                      </button>
+                    )}
                     <button 
                       onClick={() => handleSelectIdea(idea)}
                       className="w-full py-2.5 bg-neutral-900 text-white font-medium rounded-xl hover:bg-neutral-800 transition-colors text-xs flex items-center justify-center gap-1.5 shadow-sm"
@@ -2355,6 +2396,16 @@ export default function App() {
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                        {item.idea.sourceUrl && (
+                          <button
+                            type="button"
+                            onClick={(e) => handleSniperGtm(item.idea.sourceUrl!, item.idea.title, e)}
+                            className="p-1.5 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-indigo-600 rounded-lg transition-colors shadow-xs cursor-pointer"
+                            title={t.sniperGtmBtn}
+                          >
+                            <MessageSquare className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                         <button
                           onClick={() => {
                             setShowVaultModal(false);
@@ -2429,6 +2480,14 @@ export default function App() {
             </span>
           </div>
         </div>
+
+        {/* Sniper GTM Toast Bildirimi */}
+        {sniperToast && (
+          <div className="fixed bottom-6 right-6 z-50 bg-indigo-600 text-white px-4 py-3 rounded-xl shadow-2xl border border-indigo-400/50 flex items-center gap-2.5 text-xs font-semibold animate-bounce">
+            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-300" />
+            <span>{sniperToast}</span>
+          </div>
+        )}
 
       </div>
     </div>
