@@ -66,16 +66,51 @@ function extractSignalsFromRSS(xml: string, sourceName: string): SignalItem[] {
   return signals;
 }
 
-// Canli startup, SaaS ve aci noktasi sinyallerini topla (Hacker News Algolia API + Dev.to + Reddit)
+// Canli startup, SaaS ve aci noktasi sinyallerini topla (Reddit + Dev.to + Hacker News dengeli karisim)
 async function fetchRedditSignals(): Promise<FetchResult> {
-  let allItems: SignalItem[] = [];
+  const redditItems: SignalItem[] = [];
+  const devtoItems: SignalItem[] = [];
+  const hnItems: SignalItem[] = [];
   const errors: string[] = [];
 
-  // 1. Hacker News resmi Algolia REST API (Engelsiz, hizli, JSON formatinda)
+  // 1. Reddit ve Dev.to RSS kaynaklari (Gercek kullanici sikayetleri ve talepleri)
+  const rssSources = [
+    { name: "Reddit-SaaS", url: "https://old.reddit.com/r/SaaS/new.rss?limit=5", target: redditItems },
+    { name: "Reddit-Entrepreneur", url: "https://old.reddit.com/r/Entrepreneur/new.rss?limit=5", target: redditItems },
+    { name: "DevTo-SaaS", url: "https://dev.to/feed/tag/saas", target: devtoItems },
+  ];
+
+  await Promise.all(
+    rssSources.map(async (src) => {
+      try {
+        const res = await fetch(src.url, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "Accept": "application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.8"
+          },
+          signal: AbortSignal.timeout(4000),
+        });
+
+        if (res.ok) {
+          const xml = await res.text();
+          const posts = extractSignalsFromRSS(xml, src.name);
+          if (posts.length > 0) {
+            src.target.push(...posts.slice(0, 4));
+          }
+        } else {
+          errors.push(`${src.name}: HTTP ${res.status}`);
+        }
+      } catch (e: any) {
+        errors.push(`${src.name}: ${e.message}`);
+      }
+    })
+  );
+
+  // 2. Hacker News resmi Algolia REST API (Ask HN / SaaS tartismalari)
   try {
     const hnEndpoints = [
-      "https://hn.algolia.com/api/v1/search_by_date?query=SaaS&tags=story&hitsPerPage=5",
-      "https://hn.algolia.com/api/v1/search?tags=show_hn&hitsPerPage=5"
+      "https://hn.algolia.com/api/v1/search_by_date?query=SaaS&tags=story&hitsPerPage=4",
+      "https://hn.algolia.com/api/v1/search_by_date?tags=ask_hn&hitsPerPage=4"
     ];
 
     for (const url of hnEndpoints) {
@@ -84,14 +119,14 @@ async function fetchRedditSignals(): Promise<FetchResult> {
         if (res.ok) {
           const json = await res.json();
           if (Array.isArray(json?.hits)) {
-            const hnItems: SignalItem[] = json.hits
+            const items: SignalItem[] = json.hits
               .filter((h: any) => typeof h.title === "string" && h.title.trim().length > 0)
               .map((h: any) => ({
                 text: h.title.trim(),
                 url: h.objectID ? `https://news.ycombinator.com/item?id=${h.objectID}` : h.url,
                 source: "HackerNews",
               }));
-            allItems = allItems.concat(hnItems);
+            hnItems.push(...items);
           }
         }
       } catch (err: any) {
@@ -102,35 +137,13 @@ async function fetchRedditSignals(): Promise<FetchResult> {
     errors.push(`HN-Global: ${e.message}`);
   }
 
-  // 2. Dev.to ve RSS kaynaklari
-  const rssSources = [
-    { name: "DevTo-SaaS", url: "https://dev.to/feed/tag/saas" },
-    { name: "Reddit-SaaS", url: "https://old.reddit.com/r/SaaS/new.rss?limit=5" },
-    { name: "Reddit-Entrepreneur", url: "https://old.reddit.com/r/Entrepreneur/new.rss?limit=5" }
-  ];
-
-  for (const src of rssSources) {
-    try {
-      const res = await fetch(src.url, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-          "Accept": "application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.8"
-        },
-        signal: AbortSignal.timeout(4000),
-      });
-
-      if (res.ok) {
-        const xml = await res.text();
-        const posts = extractSignalsFromRSS(xml, src.name);
-        if (posts.length > 0) {
-          allItems = allItems.concat(posts.slice(0, 5));
-        }
-      } else {
-        errors.push(`${src.name}: HTTP ${res.status}`);
-      }
-    } catch (e: any) {
-      errors.push(`${src.name}: ${e.message}`);
-    }
+  // Tum platformlardan dengeli karisim (Reddit oncelikli, ardindan HN ve DevTo)
+  const allItems: SignalItem[] = [];
+  const maxLen = Math.max(redditItems.length, hnItems.length, devtoItems.length);
+  for (let i = 0; i < maxLen; i++) {
+    if (redditItems[i]) allItems.push(redditItems[i]);
+    if (hnItems[i]) allItems.push(hnItems[i]);
+    if (devtoItems[i]) allItems.push(devtoItems[i]);
   }
 
   return {

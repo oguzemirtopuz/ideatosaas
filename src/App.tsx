@@ -208,34 +208,41 @@ export default function App() {
   const isIdeaDismissed = (ideaTitle: string): boolean => {
     if (!ideaTitle) return false;
     const norm = ideaTitle.toLowerCase().trim();
-    return dismissedIdeas.some(d => d === norm || norm.includes(d) || d.includes(norm));
+    if (!norm) return false;
+    return dismissedIdeas.some(d => {
+      const cleanD = d.trim();
+      if (cleanD.length < 3) return false;
+      return cleanD === norm || norm.includes(cleanD);
+    });
   };
 
   const dismissIdea = (idea: Idea, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     const norm = idea.title.toLowerCase().trim();
+    if (!norm) return;
     setDismissedIdeas(prev => Array.from(new Set([...prev, norm])));
     setIdeas(prev => prev.filter(item => item.title.toLowerCase().trim() !== norm));
   };
 
-  // Sniper GTM (5sn Yanıt + Kaynak Linki)
+  // Sniper GTM (5sn Yanıt + Kaynak Linki) - Yanıt metni HER ZAMAN İngilizce kopyalanır
   const [sniperToast, setSniperToast] = useState<string | null>(null);
 
   const handleSniperGtm = (url: string, ideaTitle: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     const repoSlug = ideaTitle.replace(/[^a-zA-Z0-9]/g, '');
     const repoUrl = `https://github.com/oguzemirtopuz/${repoSlug}`;
-    const replyText = lang === 'en'
-      ? `Hey! I saw your post about this exact pain point. I'm a 15-year-old indie developer and actually built an open-source tool called ${ideaTitle} to solve it: ${repoUrl}\n\nWould love to hear your honest feedback!`
-      : `Merhaba! Bu konudaki paylaşımını gördüm. 15 yaşında bağımsız bir geliştiriciyim ve tam olarak bu sorunu çözmek için ${ideaTitle} adlı açık kaynaklı bir araç geliştirdim: ${repoUrl}\n\nGeri bildirimlerini duymak çok isterim!`;
-
-    try {
-      navigator.clipboard.writeText(replyText);
-      setSniperToast(t.sniperGtmCopied);
-      setTimeout(() => setSniperToast(null), 4500);
-    } catch {}
+    const replyText = `Hey! I saw your post about this exact pain point. I'm a 15-year-old indie developer and actually built an open-source tool called ${ideaTitle} to solve it: ${repoUrl}\n\nWould love to hear your honest feedback!`;
 
     window.open(url, '_blank', 'noopener,noreferrer');
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(replyText)
+        .then(() => {
+          setSniperToast(t.sniperGtmCopied);
+          setTimeout(() => setSniperToast(null), 4500);
+        })
+        .catch(() => {});
+    }
   };
 
   // Çoklu Dil (TR / EN)
@@ -421,6 +428,14 @@ export default function App() {
       if (data.ideas && Array.isArray(data.ideas)) {
         const filtered = data.ideas.filter((i: Idea) => !isIdeaDismissed(i.title));
         setIdeas(filtered);
+        if (data.ideas.length > 0 && filtered.length === 0) {
+          setWarnings(prev => [
+            ...prev,
+            lang === 'en'
+              ? 'All generated ideas in this round were filtered out because they are in your blacklist. Click Generate Ideas again.'
+              : 'Bu turda üretilen tüm fikirler kara listenizde yer aldığı için elendi. Lütfen tekrar "Fikir Üret" butonuna basın.'
+          ]);
+        }
         if (data.judgeRecommendation) {
           setJudgeRecommendation(data.judgeRecommendation);
         } else {
@@ -792,14 +807,14 @@ export default function App() {
 
   const deleteSavedIdea = (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    setSavedIdeas(prev => {
-      const target = prev.find(item => item.id === id);
-      if (target) {
-        const norm = target.idea.title.toLowerCase().trim();
+    const target = savedIdeas.find(item => item.id === id);
+    if (target) {
+      const norm = target.idea.title.toLowerCase().trim();
+      if (norm) {
         setDismissedIdeas(d => Array.from(new Set([...d, norm])));
       }
-      return prev.filter(item => item.id !== id);
-    });
+    }
+    setSavedIdeas(prev => prev.filter(item => item.id !== id));
   };
 
   // React kodunu temizleme ve import/export kalıntılarını arındırma fonksiyonu
