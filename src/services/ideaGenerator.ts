@@ -66,22 +66,54 @@ function extractSignalsFromRSS(xml: string, sourceName: string): SignalItem[] {
   return signals;
 }
 
-// Canli startup, SaaS ve aci noktasi sinyallerini topla (Reddit + Dev.to + Hacker News dengeli karisim)
+// Diziyi yerinde karistir (Fisher-Yates) - her uretimde taze kombinasyon icin
+function shuffleArray<T>(arr: T[]): T[] {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
+// Canli startup, B2B, e-ticaret ve aci noktasi sinyallerini topla (100% ucretsiz, sifir API key)
 async function fetchRedditSignals(): Promise<FetchResult> {
-  const redditItems: SignalItem[] = [];
-  const devtoItems: SignalItem[] = [];
+  const intentItems: SignalItem[] = [];
+  const b2bNicheItems: SignalItem[] = [];
+  const productHuntItems: SignalItem[] = [];
+  const redditGeneralItems: SignalItem[] = [];
   const hnItems: SignalItem[] = [];
   const errors: string[] = [];
 
-  // 1. Reddit ve Dev.to RSS kaynaklari (Gercek kullanici sikayetleri ve talepleri)
+  // 1. Tum RSS kaynaklari (Reddit Intent, B2B Nis Subredditler, ProductHunt, Genel)
   const rssSources = [
-    { name: "Reddit-SaaS", url: "https://old.reddit.com/r/SaaS/new.rss?limit=5", target: redditItems },
-    { name: "Reddit-Entrepreneur", url: "https://old.reddit.com/r/Entrepreneur/new.rss?limit=5", target: redditItems },
-    { name: "DevTo-SaaS", url: "https://dev.to/feed/tag/saas", target: devtoItems },
+    // En yuksek oncelik: Arac arayanlar (Intent Search)
+    {
+      name: "Reddit-Intent",
+      url: "https://old.reddit.com/search.rss?q=%22is+there+a+tool%22+OR+%22looking+for+software%22+OR+%22hate+manually%22&sort=new&limit=5",
+      target: intentItems,
+      limit: 5,
+    },
+    // B2B musteri topluluklari (KOBI, E-ticaret, Freelance, Ajans)
+    { name: "Reddit-SmallBusiness", url: "https://old.reddit.com/r/smallbusiness/new.rss?limit=4", target: b2bNicheItems, limit: 3 },
+    { name: "Reddit-Shopify", url: "https://old.reddit.com/r/shopify/new.rss?limit=4", target: b2bNicheItems, limit: 3 },
+    { name: "Reddit-Freelance", url: "https://old.reddit.com/r/freelance/new.rss?limit=4", target: b2bNicheItems, limit: 3 },
+    { name: "Reddit-Agency", url: "https://old.reddit.com/r/agency/new.rss?limit=4", target: b2bNicheItems, limit: 3 },
+    // Product Hunt gunluk urun akisi (Unbundling ilhami)
+    { name: "ProductHunt", url: "https://www.producthunt.com/feed", target: productHuntItems, limit: 4 },
+    // Genel SaaS & Girisimci akisi
+    { name: "Reddit-SaaS", url: "https://old.reddit.com/r/SaaS/new.rss?limit=4", target: redditGeneralItems, limit: 3 },
+    { name: "Reddit-Entrepreneur", url: "https://old.reddit.com/r/Entrepreneur/new.rss?limit=4", target: redditGeneralItems, limit: 3 },
   ];
 
-  await Promise.all(
-    rssSources.map(async (src) => {
+  // 2. Hacker News resmi Algolia REST API (Ask HN / SaaS tartismalari)
+  const hnEndpoints = [
+    "https://hn.algolia.com/api/v1/search_by_date?query=SaaS&tags=story&hitsPerPage=4",
+    "https://hn.algolia.com/api/v1/search_by_date?tags=ask_hn&hitsPerPage=4"
+  ];
+
+  await Promise.all([
+    ...rssSources.map(async (src) => {
       try {
         const res = await fetch(src.url, {
           headers: {
@@ -95,7 +127,7 @@ async function fetchRedditSignals(): Promise<FetchResult> {
           const xml = await res.text();
           const posts = extractSignalsFromRSS(xml, src.name);
           if (posts.length > 0) {
-            src.target.push(...posts.slice(0, 4));
+            src.target.push(...posts.slice(0, src.limit));
           }
         } else {
           errors.push(`${src.name}: HTTP ${res.status}`);
@@ -103,17 +135,8 @@ async function fetchRedditSignals(): Promise<FetchResult> {
       } catch (e: any) {
         errors.push(`${src.name}: ${e.message}`);
       }
-    })
-  );
-
-  // 2. Hacker News resmi Algolia REST API (Ask HN / SaaS tartismalari)
-  try {
-    const hnEndpoints = [
-      "https://hn.algolia.com/api/v1/search_by_date?query=SaaS&tags=story&hitsPerPage=4",
-      "https://hn.algolia.com/api/v1/search_by_date?tags=ask_hn&hitsPerPage=4"
-    ];
-
-    for (const url of hnEndpoints) {
+    }),
+    ...hnEndpoints.map(async (url) => {
       try {
         const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
         if (res.ok) {
@@ -132,18 +155,25 @@ async function fetchRedditSignals(): Promise<FetchResult> {
       } catch (err: any) {
         errors.push(`HN-Algolia: ${err.message}`);
       }
-    }
-  } catch (e: any) {
-    errors.push(`HN-Global: ${e.message}`);
-  }
+    }),
+  ]);
 
-  // Tum platformlardan dengeli karisim (Reddit oncelikli, ardindan HN ve DevTo)
+  // Her havuzu hafifce karistir (ayni gun icinde tekrarlanan fikirleri onler)
+  const sIntent = shuffleArray(intentItems);
+  const sB2B = shuffleArray(b2bNicheItems);
+  const sPH = shuffleArray(productHuntItems);
+  const sGeneral = shuffleArray(redditGeneralItems);
+  const sHN = shuffleArray(hnItems);
+
+  // Oncelik sirasiyla dengeli harmanlama: Intent -> B2B Nis -> ProductHunt -> Genel -> HN
   const allItems: SignalItem[] = [];
-  const maxLen = Math.max(redditItems.length, hnItems.length, devtoItems.length);
+  const maxLen = Math.max(sIntent.length, sB2B.length, sPH.length, sGeneral.length, sHN.length);
   for (let i = 0; i < maxLen; i++) {
-    if (redditItems[i]) allItems.push(redditItems[i]);
-    if (hnItems[i]) allItems.push(hnItems[i]);
-    if (devtoItems[i]) allItems.push(devtoItems[i]);
+    if (sIntent[i]) allItems.push(sIntent[i]);
+    if (sB2B[i]) allItems.push(sB2B[i]);
+    if (sPH[i]) allItems.push(sPH[i]);
+    if (sGeneral[i]) allItems.push(sGeneral[i]);
+    if (sHN[i]) allItems.push(sHN[i]);
   }
 
   return {
@@ -445,7 +475,7 @@ Yanıtını KESİNLİKLE sadece aşağıdaki şemaya sahip tek elemanlı bir JSO
   }
 ]`;
     } else {
-      const indexedSignals = signalItems.slice(0, 10).map((s, idx) => `[${idx}] (${s.source || 'Signal'}): ${s.text}`);
+      const indexedSignals = signalItems.slice(0, 12).map((s, idx) => `[${idx}] (${s.source || 'Signal'}): ${s.text}`);
       prompt = lang === "en"
         ? `You are a seasoned startup founder, solo founder mentor, and full-stack architect.
 Your mission is to analyze real-time market signals below and synthesize EXACTLY 3 DISTINCT, HIGH-CONVERTING, ZERO-COST (React/Tailwind, Supabase free tier, Vercel free tier) 1-Day Micro-SaaS ideas. All text MUST be in English.
