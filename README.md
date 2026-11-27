@@ -93,9 +93,10 @@ The journey from **"I have an idea"** to **"Here is a working prototype users ca
 ```
 
 ### 1. Market Intelligence & Architectural PRD
-- Real-time market signal engine aggregating live builder discussions, user complaints, and product pain points from Hacker News (Algolia REST API), Dev.to SaaS feeds, Reddit, and curated Google Trends telemetry.
-- **Negative Filtering & Reality Engine:** Intelligently blacklists non-viable ideas (oversaturated calendars, low-margin utilities, single-dev cybersecurity traps) while prioritizing high-velocity B2B micro-SaaS opportunities.
-- **Investor Badges & AI Judge Recommendation:** Evaluates every concept with visual verdict badges (`High Potential`, `Niche Opportunity`, `Trap`) and highlights the strongest candidate with actionable rationale.
+- Real-time multi-source signal engine aggregating live builder discussions, user complaints, and product pain points from **Arctic Shift Reddit JSON API** (rotating high-intent B2B subreddits like `smallbusiness`, `shopify`, `freelance`, `agency`, `SaaS`), **Hacker News Algolia REST API**, **Dev.to**, and **Product Hunt**.
+- **🎯 Sniper GTM Engine:** Directly links each synthesized idea to its original community post and provides a 1-click 5-second English outreach template referencing the open-source repository for instant founder-led distribution.
+- **🛡️ Anti-Repeat & Blacklist Shield:** Dual-layer defense pre-seeded with 24 past projects, 1-click idea dismissal, and auto-blacklisting from the Idea Vault to ensure 100% novel, non-repetitive concept generation.
+- **Investor Badges & AI Judge Recommendation:** Evaluates every concept with visual verdict badges (`High Potential`, `Niche Opportunity`, `Trap`) and highlights the strongest candidate with synchronized rationale.
 - **Idea Vault & Bookmark Engine:** One-click bookmarking for generated concepts. Founders can hoard vetted opportunities into their local vault and trigger on-demand Stage 2 prototyping anytime.
 - Multi-tier resilient fallback architecture guaranteeing continuous signal pipeline without rate limits or bot blocks.
 - Generates a full product specification: Value Proposition, Target Audience (ICP), Core Features, Technical Architecture, and explicit **v1 Boundaries** (what's built now vs. what's out of scope).
