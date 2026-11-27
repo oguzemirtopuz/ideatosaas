@@ -428,20 +428,26 @@ export default function App() {
       if (data.ideas && Array.isArray(data.ideas)) {
         const filtered = data.ideas.filter((i: Idea) => !isIdeaDismissed(i.title));
         setIdeas(filtered);
+        
+        const nextWarnings: string[] = Array.isArray(data.warnings) ? [...data.warnings] : [];
         if (data.ideas.length > 0 && filtered.length === 0) {
-          setWarnings(prev => [
-            ...prev,
+          nextWarnings.push(
             lang === 'en'
               ? 'All generated ideas in this round were filtered out because they are in your blacklist. Click Generate Ideas again.'
               : 'Bu turda üretilen tüm fikirler kara listenizde yer aldığı için elendi. Lütfen tekrar "Fikir Üret" butonuna basın.'
-          ]);
+          );
         }
+        setWarnings(nextWarnings);
+
         if (data.judgeRecommendation) {
-          setJudgeRecommendation(data.judgeRecommendation);
+          // Eger onerilen fikir kara liste tarafindan elendiyse tutarsiz tavsiyeyi temizle
+          const recLower = data.judgeRecommendation.toLowerCase();
+          const mentionsDismissed = dismissedIdeas.some(d => d.trim().length >= 3 && recLower.includes(d.trim()));
+          const isTopPickVisible = filtered.some((f: Idea) => recLower.includes(f.title.toLowerCase().trim()));
+          setJudgeRecommendation(isTopPickVisible && !mentionsDismissed ? data.judgeRecommendation : '');
         } else {
           setJudgeRecommendation('');
         }
-        if (data.warnings) setWarnings(data.warnings);
         if (data.rawSignals) setRawSignals(data.rawSignals);
       } else {
         throw new Error('Geçersiz veri formatı');

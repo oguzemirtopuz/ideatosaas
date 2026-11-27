@@ -78,65 +78,103 @@ function shuffleArray<T>(arr: T[]): T[] {
 
 // Canli startup, B2B, e-ticaret ve aci noktasi sinyallerini topla (100% ucretsiz, sifir API key)
 async function fetchRedditSignals(): Promise<FetchResult> {
-  const intentItems: SignalItem[] = [];
-  const b2bNicheItems: SignalItem[] = [];
+  const b2bRedditItems: SignalItem[] = [];
   const productHuntItems: SignalItem[] = [];
-  const redditGeneralItems: SignalItem[] = [];
+  const devtoItems: SignalItem[] = [];
   const hnItems: SignalItem[] = [];
   const errors: string[] = [];
 
-  // 1. Tum RSS kaynaklari (Reddit Intent, B2B Nis Subredditler, ProductHunt, Genel)
-  const rssSources = [
-    // En yuksek oncelik: Arac arayanlar (Intent Search)
-    {
-      name: "Reddit-Intent",
-      url: "https://old.reddit.com/search.rss?q=%22is+there+a+tool%22+OR+%22looking+for+software%22+OR+%22hate+manually%22&sort=new&limit=5",
-      target: intentItems,
-      limit: 5,
-    },
-    // B2B musteri topluluklari (KOBI, E-ticaret, Freelance, Ajans)
-    { name: "Reddit-SmallBusiness", url: "https://old.reddit.com/r/smallbusiness/new.rss?limit=4", target: b2bNicheItems, limit: 3 },
-    { name: "Reddit-Shopify", url: "https://old.reddit.com/r/shopify/new.rss?limit=4", target: b2bNicheItems, limit: 3 },
-    { name: "Reddit-Freelance", url: "https://old.reddit.com/r/freelance/new.rss?limit=4", target: b2bNicheItems, limit: 3 },
-    { name: "Reddit-Agency", url: "https://old.reddit.com/r/agency/new.rss?limit=4", target: b2bNicheItems, limit: 3 },
-    // Product Hunt gunluk urun akisi (Unbundling ilhami)
-    { name: "ProductHunt", url: "https://www.producthunt.com/feed", target: productHuntItems, limit: 4 },
-    // Genel SaaS & Girisimci akisi
-    { name: "Reddit-SaaS", url: "https://old.reddit.com/r/SaaS/new.rss?limit=4", target: redditGeneralItems, limit: 3 },
-    { name: "Reddit-Entrepreneur", url: "https://old.reddit.com/r/Entrepreneur/new.rss?limit=4", target: redditGeneralItems, limit: 3 },
-  ];
-
-  // 2. Hacker News resmi Algolia REST API (Ask HN / SaaS tartismalari)
-  const hnEndpoints = [
-    "https://hn.algolia.com/api/v1/search_by_date?query=SaaS&tags=story&hitsPerPage=4",
-    "https://hn.algolia.com/api/v1/search_by_date?tags=ask_hn&hitsPerPage=4"
-  ];
+  // Her cagrida farkli bir B2B alt topluluk sec (Arctic Shift rate-limit korumasi + yuksek cesitlilik)
+  const b2bSubreddits = ["smallbusiness", "shopify", "freelance", "agency", "SaaS", "Entrepreneur"];
+  const selectedSub = b2bSubreddits[Math.floor(Math.random() * b2bSubreddits.length)];
 
   await Promise.all([
-    ...rssSources.map(async (src) => {
+    // 1. Arctic Shift Reddit API (Reddit'in HTML bot engelini asan gercek JSON akisi - tekli istek, 0 rate limit)
+    (async () => {
       try {
-        const res = await fetch(src.url, {
-          headers: {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-            "Accept": "application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.8"
-          },
-          signal: AbortSignal.timeout(4000),
+        const url = `https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=${selectedSub}&sort=desc&limit=6`;
+        const res = await fetch(url, {
+          headers: { "User-Agent": "IdeaToSaaS/1.3" },
+          signal: AbortSignal.timeout(5000),
         });
-
         if (res.ok) {
-          const xml = await res.text();
-          const posts = extractSignalsFromRSS(xml, src.name);
-          if (posts.length > 0) {
-            src.target.push(...posts.slice(0, src.limit));
+          const json = await res.json();
+          if (Array.isArray(json?.data)) {
+            const posts: SignalItem[] = json.data
+              .filter((p: any) => typeof p.title === "string" && p.title.trim().length > 0)
+              .map((p: any) => {
+                const snippet = typeof p.selftext === "string" && p.selftext.trim().length > 0
+                  ? ` - ${p.selftext.replace(/\s+/g, " ").substring(0, 140).trim()}`
+                  : "";
+                return {
+                  text: `${p.title.trim()}${snippet}`,
+                  url: p.id ? `https://www.reddit.com/r/${p.subreddit || selectedSub}/comments/${p.id}` : undefined,
+                  source: `Reddit-r/${p.subreddit || selectedSub}`,
+                };
+              });
+            b2bRedditItems.push(...posts);
           }
         } else {
-          errors.push(`${src.name}: HTTP ${res.status}`);
+          errors.push(`ArcticShift-${selectedSub}: HTTP ${res.status}`);
         }
       } catch (e: any) {
-        errors.push(`${src.name}: ${e.message}`);
+        errors.push(`ArcticShift-${selectedSub}: ${e.message}`);
       }
-    }),
-    ...hnEndpoints.map(async (url) => {
+    })(),
+
+    // 2. Product Hunt resmi Atom/RSS akisi
+    (async () => {
+      try {
+        const res = await fetch("https://www.producthunt.com/feed", {
+          headers: { "User-Agent": "IdeaToSaaS/1.3" },
+          signal: AbortSignal.timeout(4500),
+        });
+        if (res.ok) {
+          const xml = await res.text();
+          const posts = extractSignalsFromRSS(xml, "ProductHunt");
+          if (posts.length > 0) {
+            productHuntItems.push(...posts.slice(0, 6));
+          }
+        } else {
+          errors.push(`ProductHunt: HTTP ${res.status}`);
+        }
+      } catch (e: any) {
+        errors.push(`ProductHunt: ${e.message}`);
+      }
+    })(),
+
+    // 3. Dev.to resmi JSON API
+    (async () => {
+      try {
+        const res = await fetch("https://dev.to/api/articles?tag=saas&per_page=5", {
+          headers: { "User-Agent": "IdeaToSaaS/1.3" },
+          signal: AbortSignal.timeout(4500),
+        });
+        if (res.ok) {
+          const articles = await res.json();
+          if (Array.isArray(articles)) {
+            const items: SignalItem[] = articles
+              .filter((a: any) => typeof a.title === "string" && a.title.trim().length > 0)
+              .map((a: any) => ({
+                text: a.description ? `${a.title.trim()} - ${a.description.substring(0, 120).trim()}` : a.title.trim(),
+                url: a.url,
+                source: "DevTo",
+              }));
+            devtoItems.push(...items);
+          }
+        } else {
+          errors.push(`DevTo: HTTP ${res.status}`);
+        }
+      } catch (e: any) {
+        errors.push(`DevTo: ${e.message}`);
+      }
+    })(),
+
+    // 4. Hacker News resmi Algolia REST API (Ask HN / SaaS tartismalari)
+    ...[
+      "https://hn.algolia.com/api/v1/search_by_date?query=SaaS&tags=story&hitsPerPage=4",
+      "https://hn.algolia.com/api/v1/search_by_date?tags=ask_hn&hitsPerPage=4"
+    ].map(async (url) => {
       try {
         const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
         if (res.ok) {
@@ -159,21 +197,19 @@ async function fetchRedditSignals(): Promise<FetchResult> {
   ]);
 
   // Her havuzu hafifce karistir (ayni gun icinde tekrarlanan fikirleri onler)
-  const sIntent = shuffleArray(intentItems);
-  const sB2B = shuffleArray(b2bNicheItems);
+  const sReddit = shuffleArray(b2bRedditItems);
   const sPH = shuffleArray(productHuntItems);
-  const sGeneral = shuffleArray(redditGeneralItems);
   const sHN = shuffleArray(hnItems);
+  const sDevTo = shuffleArray(devtoItems);
 
-  // Oncelik sirasiyla dengeli harmanlama: Intent -> B2B Nis -> ProductHunt -> Genel -> HN
+  // Oncelik sirasiyla dengeli harmanlama: B2B Reddit -> ProductHunt -> HN -> DevTo
   const allItems: SignalItem[] = [];
-  const maxLen = Math.max(sIntent.length, sB2B.length, sPH.length, sGeneral.length, sHN.length);
+  const maxLen = Math.max(sReddit.length, sPH.length, sHN.length, sDevTo.length);
   for (let i = 0; i < maxLen; i++) {
-    if (sIntent[i]) allItems.push(sIntent[i]);
-    if (sB2B[i]) allItems.push(sB2B[i]);
+    if (sReddit[i]) allItems.push(sReddit[i]);
     if (sPH[i]) allItems.push(sPH[i]);
-    if (sGeneral[i]) allItems.push(sGeneral[i]);
     if (sHN[i]) allItems.push(sHN[i]);
+    if (sDevTo[i]) allItems.push(sDevTo[i]);
   }
 
   return {
