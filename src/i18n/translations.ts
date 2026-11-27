@@ -116,6 +116,7 @@ export interface Translations {
   // Fikir Havuzu & Bookmark
   bookmarkIdeaTooltip: string;
   unbookmarkIdeaTooltip: string;
+  dismissIdeaTooltip: string;
   vaultModalTitle: string;
   vaultModalDesc: string;
   noSavedIdeas: string;
@@ -123,6 +124,7 @@ export interface Translations {
   deleteSavedIdeaBtn: string;
   ideaSavedToast: string;
   ideaRemovedToast: string;
+  ideaDismissedToast: string;
 
   // Uyarılar
   quotaWarningTitle: string;
@@ -247,6 +249,7 @@ export const translations: Record<Language, Translations> = {
     // Fikir Havuzu & Bookmark
     bookmarkIdeaTooltip: "Fikri Havuzuma Kaydet",
     unbookmarkIdeaTooltip: "Fikri Havuzumdan Çıkar",
+    dismissIdeaTooltip: "Bu Fikri Bir Daha Gösterme (Kara Listeye Al)",
     vaultModalTitle: "Kaydedilen Fikir Havuzu",
     vaultModalDesc: "Daha sonra prototiplemek üzere kaydettiğiniz mikro-SaaS fikirleri.",
     noSavedIdeas: "Henüz kaydedilmiş bir fikir yok. Beğendiğiniz fikirlerin sağ üstündeki yer imi (bookmark) butonuna tıklayarak havuza ekleyebilirsiniz!",
@@ -254,6 +257,7 @@ export const translations: Record<Language, Translations> = {
     deleteSavedIdeaBtn: "Kaldır",
     ideaSavedToast: "Fikir havuzuna kaydedildi!",
     ideaRemovedToast: "Fikir havuzundan çıkarıldı.",
+    ideaDismissedToast: "Fikir kara listeye alındı ve bir daha önerilmeyecek.",
 
   // Uyarılar
     quotaWarningTitle: "Kota / API Uyarısı",
@@ -376,6 +380,7 @@ export const translations: Record<Language, Translations> = {
     // Fikir Havuzu & Bookmark
     bookmarkIdeaTooltip: "Save Idea to Vault",
     unbookmarkIdeaTooltip: "Remove from Vault",
+    dismissIdeaTooltip: "Never Show This Idea Again (Blacklist)",
     vaultModalTitle: "Saved Idea Vault",
     vaultModalDesc: "Micro-SaaS concepts you bookmarked to build when you have time.",
     noSavedIdeas: "No saved ideas yet. Click the bookmark icon on any idea card to save it for later!",
@@ -383,6 +388,7 @@ export const translations: Record<Language, Translations> = {
     deleteSavedIdeaBtn: "Remove",
     ideaSavedToast: "Idea saved to vault!",
     ideaRemovedToast: "Idea removed from vault.",
+    ideaDismissedToast: "Idea blacklisted and will not be suggested again.",
 
   // Uyarılar
     quotaWarningTitle: "Quota / API Notice",

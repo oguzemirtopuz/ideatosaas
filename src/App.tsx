@@ -7,7 +7,7 @@ import {
   Layers, Hammer, Eye, Play, Sparkles, Check, Download, ExternalLink,
   TrendingUp, BarChart3, Users, Archive, Send, MessageSquare, 
   UserCheck, History, Trash2, FolderGit2, RefreshCw, Key, Settings, Copy,
-  Sun, Moon, Globe, Bookmark, BookmarkCheck
+  Sun, Moon, Globe, Bookmark, BookmarkCheck, Ban
 } from 'lucide-react';
 
 interface IdeaScore {
@@ -85,6 +85,34 @@ interface SavedIdea {
   idea: Idea;
 }
 
+// Geçmişte üretilmiş, incelenmiş veya reddedilmiş varsayılan tohum kara liste
+const SEED_DISMISSED_IDEAS: string[] = [
+  'codecontext',
+  'spendgenius',
+  'inventorysync',
+  'promptsync',
+  'reviewharvest',
+  'leadsnap',
+  'leadpulse',
+  'autoquote',
+  'autoquote pro',
+  'reviewpulse',
+  'formtolead',
+  'changeloghero',
+  'invoicechaser',
+  'scopelock',
+  'instantreplyhub',
+  'vocalcleaner',
+  'pyauditor',
+  'superarmor',
+  'autocutter',
+  'viralcut',
+  'rankvibe',
+  'cropocalypse',
+  'deal hunter',
+  'finish & click'
+];
+
 export default function App() {
   // Kullanıcı ve Oturum Yönetimi
   const [userEmail, setUserEmail] = useState<string>(() => {
@@ -149,6 +177,36 @@ export default function App() {
       localStorage.setItem('ideatosaas_saved_ideas', JSON.stringify(savedIdeas));
     } catch {}
   }, [savedIdeas]);
+
+  // Kara Liste / Bir Daha Gösterme Hafızası
+  const [dismissedIdeas, setDismissedIdeas] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('ideatosaas_dismissed_ideas');
+      const userList: string[] = saved ? JSON.parse(saved) : [];
+      return Array.from(new Set([...SEED_DISMISSED_IDEAS, ...userList.map(s => s.toLowerCase().trim())]));
+    } catch {
+      return SEED_DISMISSED_IDEAS;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('ideatosaas_dismissed_ideas', JSON.stringify(dismissedIdeas));
+    } catch {}
+  }, [dismissedIdeas]);
+
+  const isIdeaDismissed = (ideaTitle: string): boolean => {
+    if (!ideaTitle) return false;
+    const norm = ideaTitle.toLowerCase().trim();
+    return dismissedIdeas.some(d => d === norm || norm.includes(d) || d.includes(norm));
+  };
+
+  const dismissIdea = (idea: Idea, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const norm = idea.title.toLowerCase().trim();
+    setDismissedIdeas(prev => Array.from(new Set([...prev, norm])));
+    setIdeas(prev => prev.filter(item => item.title.toLowerCase().trim() !== norm));
+  };
 
   // Çoklu Dil (TR / EN)
   const [lang, setLang] = useState<Language>(() => {
@@ -331,7 +389,8 @@ export default function App() {
       }
       
       if (data.ideas && Array.isArray(data.ideas)) {
-        setIdeas(data.ideas);
+        const filtered = data.ideas.filter((i: Idea) => !isIdeaDismissed(i.title));
+        setIdeas(filtered);
         if (data.judgeRecommendation) {
           setJudgeRecommendation(data.judgeRecommendation);
         } else {
@@ -703,7 +762,14 @@ export default function App() {
 
   const deleteSavedIdea = (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    setSavedIdeas(prev => prev.filter(item => item.id !== id));
+    setSavedIdeas(prev => {
+      const target = prev.find(item => item.id === id);
+      if (target) {
+        const norm = target.idea.title.toLowerCase().trim();
+        setDismissedIdeas(d => Array.from(new Set([...d, norm])));
+      }
+      return prev.filter(item => item.id !== id);
+    });
   };
 
   // React kodunu temizleme ve import/export kalıntılarını arındırma fonksiyonu
@@ -1950,6 +2016,15 @@ export default function App() {
                         }`}
                       >
                         <Bookmark className={`w-4 h-4 transition-transform active:scale-125 ${isIdeaBookmarked(idea) ? 'fill-amber-500 text-amber-500' : ''}`} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => dismissIdea(idea, e)}
+                        title={t.dismissIdeaTooltip}
+                        aria-label={t.dismissIdeaTooltip}
+                        className="p-1.5 rounded-full border bg-neutral-100 hover:bg-rose-500/15 dark:bg-neutral-800 dark:hover:bg-rose-500/20 border-neutral-200 dark:border-neutral-700 hover:border-rose-500/40 text-neutral-400 hover:text-rose-500 transition-all cursor-pointer"
+                      >
+                        <Ban className="w-4 h-4 transition-transform active:scale-125" />
                       </button>
                     </div>
                   </div>
