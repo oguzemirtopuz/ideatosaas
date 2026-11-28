@@ -519,24 +519,25 @@ Your mission is to analyze real-time market signals below and synthesize EXACTLY
 Live Developer Discussions / Pain Points (indexed): ${JSON.stringify(indexedSignals.length > 0 ? indexedSignals : redditData.slice(0, 10))}
 Search Trends: ${JSON.stringify(trendData.slice(0, 10))}
 
-🚫 STRICT NEGATIVE FILTERS (BLACKLIST - NEVER GENERATE THESE):
-1. Cybersecurity, SIEM, autonomous defense, or antivirus tools are STRICTLY FORBIDDEN (impossible for a solo builder in 1 day).
-2. Pure log converters, timestamp formatters, or trivial calculators are FORBIDDEN (zero willingness to pay).
-3. Calendar/scheduling tools are FORBIDDEN (monopolized by Calendly/Cal.com; sync overhead is brutal).
-4. Invoicing, accounting, or tax compliance tools are FORBIDDEN (onerous legal/jurisdiction hurdles).
+🚫 STRICT NEGATIVE FILTERS (ANTI-CLICHÉ BLACKLIST - NEVER GENERATE THESE):
+1. No Zapier / Data-Mover Clones: Generic "sync spreadsheets to CRM", "move form submissions to webhook", or multi-app workflow builders are STRICTLY FORBIDDEN.
+2. No Platform-Native Duplicates or Cold Outreach: Tools platforms already give away for free (e.g., Shopify product description writers, Clockify time trackers), LinkedIn scrapers, cold email sequencers, and generic proposal/quote generators are FORBIDDEN.
+3. No Heavy Infra / Legal Traps: Cybersecurity/SIEM, invoicing/tax compliance, and calendar/scheduling tools (Calendly clones) are STRICTLY FORBIDDEN.
+4. No Trivial / B2C Toys: Pure log formatters, timestamp converters, or B2C lifestyle/habit apps with zero willingness to pay are FORBIDDEN.
 
-✅ MANDATORY HIGH-CONVERSION NICHES:
-1. High-velocity B2B Sales / Lead / Speed-to-lead response automation.
-2. Developer tools & context synchronizers for engineers coding with AI assistants (Cursor, Claude Code, Windsurf).
-3. Operational automation utilities that save SMBs hundreds of manual hours.
+🎯 B2B UNBUNDLING COMPASS (WHAT TO BUILD):
+- Target ONLY B2B buyers (agencies, e-commerce merchants, SMBs, consultancies) who willingly pay $19–$79/mo to protect revenue, prevent churn, or eliminate a single painful, repetitive manual bottleneck.
+- Unbundle One Ugly Workflow: Do NOT design a broad platform or general dashboard. Scan the signals for real complaints; if a signal exposes a specific pain, build a micro-tool solving ONLY that single bottleneck (if signals are general articles, synthesize an unbundled bottleneck from real B2B operations).
+  - Bad (Generic): "A general project, task, and time management suite for freelancers."
+  - Good (Unbundled): "A single-purpose tool that turns out-of-scope client requests into instant signed change-order agreements."
 
 RULES:
-1. Never use generic placeholders like 'Brand Name 1', 'App Name', or 'Application 1'. Give them memorable SaaS titles.
+1. Give each idea a sharp, memorable SaaS title reflecting the single job it does (never use generic placeholders like 'Brand Name 1' or 'App Name').
 2. Problem descriptions must be compelling and real (2-3 sentences).
 3. mvpScope must contain 3 realistic, shippable v1 bullet points.
 4. verdict: "high_potential" | "niche" | "trap"
 5. verdictReason: 1-2 sentences of candid, brutal investor reality check.
-6. signalIndex: integer index [0..9] of the signal that inspired this idea (or 0 if general).
+6. signalIndex: integer index [0..11] of the signal that inspired this idea (or 0 if synthesized from general B2B workflow).
 7. Output MUST strictly be a JSON array starting with '[' and ending with ']'.
 
 JSON Schema:
@@ -562,24 +563,25 @@ Görevin, aşağıdaki gerçek piyasa sinyallerini analiz ederek sıfır maliyet
 Reddit / HN Şikayetleri ve Talepleri (indeksli): ${JSON.stringify(indexedSignals.length > 0 ? indexedSignals : redditData.slice(0, 10))}
 Google Trends (Bugün): ${JSON.stringify(trendData.slice(0, 10))}
 
-🚫 KATI YASAKLAR (KARA LİSTE - BU FİKİRLERİ KESİNLİKLE ÜRETME):
-1. Siber güvenlik, antivirüs, otonom savunma veya SIEM araçları KESİNLİKLE YASAKTIR (tek kişilik kurucu için imkansız, aylar sürer).
-2. Sadece log formatlayıcı, zaman/timezone dönüştürücü veya basit hesap makinesi gibi kimsenin para ödemeyeceği önemsiz yardımcı araçlar YASAKTIR.
-3. Takvim ve randevu planlayıcı araçlar YASAKTIR (Calendly ve Cal.com tekeli vardır; takvim senkronizasyon yükü çok büyüktür).
-4. Fatura, muhasebe veya yasal vergi mevzuatına bağlı araçlar YASAKTIR (yasal riskler ve operasyonel yük tek kişi için hantaldır).
+🚫 KATI YASAKLAR (ANTİ-KLİŞE KARA LİSTE - BU FİKİRLERİ KESİNLİKLE ÜRETME):
+1. Zapier / Veri Taşıma Klonları Yasak: "E-tablodan CRM'e veri aktar, formdan webhook'a veri taşı" gibi genel otomasyon ve veri taşıma araçları KESİNLİKLE YASAKTIR.
+2. Platformların Ücretsiz Özellikleri ve Cold Outreach Yasak: Shopify'ın ürün açıklaması yazıcısı, Clockify'ın zaman sayacı gibi platformların zaten bedava sunduğu araçlar; ayrıca LinkedIn kazıma (scraping), cold email dizileri ve genel teklif (proposal) oluşturucular YASAKTIR.
+3. Ağır Altyapı ve Yasal Tuzaklar Yasak: Siber güvenlik/SIEM, fatura/vergi mevzuatı araçları ve takvim/randevu planlayıcılar (Calendly klonları) KESİNLİKLE YASAKTIR.
+4. Ödeme Gücü Olmayan B2C / Basit Araçlar Yasak: Log formatlayıcı, zaman dönüştürücü veya bireysel kullanıcıların para vermeyeceği B2C yaşam/alışkanlık uygulamaları YASAKTIR.
 
-✅ ZORUNLU ODAK ALANLARI:
-1. Doğrudan müşteriye para kazandıran B2B Satış / Lead / Müşteri Dönüştürme araçları (Speed-to-lead, anında teklif, form yakalama vb.).
-2. AI ile kodlama yapan yazılımcıların akut sorunlarını çözen DevTools (kod bağlamı/context, mimari senkronizasyon, prompt kuralları vb.).
-3. Küçük işletmelerin (SMB) tekrarlayan manuel işlerini otomatikleştirip saatlerini kurtaran mikro-SaaS'lar.
+🎯 B2B UNBUNDLING PUSULASI (NE ÜRETMELİSİN):
+- Yalnızca gelirini korumak, müşteri kaybını (churn) önlemek veya saatler süren tek bir çirkin manuel işi bitirmek için aylık $19–$79 ödemeye hazır B2B alıcılara (ajanslar, e-ticaret mağazaları, KOBİ'ler, danışmanlık firmaları) odaklan.
+- Tek Bir İş Akışını Unbundle Et: Geniş kapsamlı bir platform veya genel yönetim paneli tasarlama. Sinyallerde gerçek bir şikayet/acı varsa doğrudan onu hedefle (sinyaller genel makale ise gerçek B2B iş akışlarından somut bir darboğaz sentezle) ve SADECE o tek işi çözen keskin bir mikro-araç üret.
+  - Kötü (Yasak): "Freelancer'lar için genel proje, görev ve zaman takip platformu."
+  - İyi (Hedef): "Müşterinin kapsam dışı ek isteklerini tek tıkla imzalı onay belgesine dönüştüren tek-amaçlı mikro araç."
 
 ÖNEMLİ KURALLAR:
-1. Kesinlikle 'Real Brand Name', 'Gerçek Marka Adı', 'Brand Name 1', 'Uygulama 1' gibi jenerik/sahte başlıklar KULLANMA. Fikirlere gerçek, yaratıcı SaaS adları ver (Örn: InvoicePulse, FormFlow, LeadCatch, RankTracker vb.).
+1. Kesinlikle 'Real Brand Name', 'Gerçek Marka Adı', 'Brand Name 1', 'Uygulama 1' gibi jenerik/sahte başlıklar KULLANMA. Fikrin yaptığı tek işi net anlatan özgün, akılda kalıcı bir SaaS adı ver.
 2. Problem tanımları gerçek ve ikna edici olmalı (2-3 cümle). '1-2 sentences describing the problem' gibi şablon metinleri asla kopyalama!
 3. mvpScope içinde 1 günde bitirilebilecek somut 3 ana özellik yaz. 'Feature 1', 'Özellik 1' gibi yer tutucular YASAKTIR.
 4. verdict alanı: "high_potential" | "niche" | "trap" değerlerinden biri olmalı.
 5. verdictReason: Fikrin para kazanma ve uygulanabilirlik potansiyelini özetleyen 1-2 cümlelik dürüst hakem yorumu olmalı.
-6. signalIndex: Bu fikre ilham veren sinyalin indeks numarası (0..9 arası tamsayı).
+6. signalIndex: Bu fikre ilham veren sinyalin indeks numarası (0..11 arası tamsayı; genel B2B iş akışından sentezlendiyse 0).
 7. Çıktı KESİNLİKLE doğrudan '[' ile başlayıp ']' ile biten geçerli bir JSON dizisi olmalıdır.
 
 JSON Şeması:
