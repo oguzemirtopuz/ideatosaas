@@ -1,0 +1,18 @@
+# Idea to Saas
+
+> Autonomous B2B Micro-SaaS Idea-to-App Pipeline & Validator
+
+## Core Overview
+- Domain: https://ideatosaas.vercel.app/
+- Category: Developer Tools / B2B SaaS Pipeline
+- Mission: Scrapes high-intent market signals from Reddit, Hacker News, and Dev.to, filters out saturated clichés, and generates production-ready micro-SaaS blueprints with live interactive previews and sniper go-to-market strategies.
+
+## Key Capabilities
+- Live Market Signal Harvester: Multi-source real-time intent extraction.
+- Anti-Repeat Blacklist Shield: Prevents duplicate concept fatigue.
+- Sniper GTM Engine: Generates context-aware, 1-click launch replies.
+- Spec & Architecture Generator: Full SPEC.md blueprints for Next.js SaaS builds.
+
+## Canonical Links
+- Web App: https://ideatosaas.vercel.app/
+- Source Code: https://github.com/oguzemirtopuz/ideatosaas
