@@ -408,6 +408,18 @@ export async function generateIdeasHandler(req: Request, res: Response) {
     }
 
     const customIdea = req.body?.customIdea;
+    const rawDismissed = Array.isArray(req.body?.dismissedIdeas) ? req.body.dismissedIdeas : [];
+    const dismissedList: string[] = rawDismissed
+      .filter((d: unknown): d is string => typeof d === "string" && d.trim().length >= 2)
+      .map((d: string) => d.trim().toLowerCase())
+      .slice(0, 80);
+
+    const dismissedBlockEn = dismissedList.length > 0
+      ? `\n🚫 ALREADY BUILT / DISMISSED IDEAS (NEVER GENERATE THESE OR CLOSE VARIATIONS): ${dismissedList.join(", ")}\n`
+      : "";
+    const dismissedBlockTr = dismissedList.length > 0
+      ? `\n🚫 DAHA ÖNCE YAPILMIŞ / YASAKLANMIŞ FİKİRLER (BUNLARI VEYA BENZERLERİNİ KESİNLİKLE ÜRETME): ${dismissedList.join(", ")}\n`
+      : "";
 
     let redditData: string[] = [];
     let signalItems: SignalItem[] = [];
@@ -517,7 +529,7 @@ Yanıtını KESİNLİKLE sadece aşağıdaki şemaya sahip tek elemanlı bir JSO
 Your mission is to analyze real-time market signals below and synthesize EXACTLY 3 DISTINCT, HIGH-CONVERTING, ZERO-COST (React/Tailwind, Supabase free tier, Vercel free tier) 1-Day Micro-SaaS ideas. All text MUST be in English.
 
 Live Developer Discussions / Pain Points (indexed): ${JSON.stringify(indexedSignals.length > 0 ? indexedSignals : redditData.slice(0, 10))}
-Search Trends: ${JSON.stringify(trendData.slice(0, 10))}
+Search Trends: ${JSON.stringify(trendData.slice(0, 10))}${dismissedBlockEn}
 
 🚫 STRICT NEGATIVE FILTERS (ANTI-CLICHÉ BLACKLIST - NEVER GENERATE THESE):
 1. No Zapier / Data-Mover Clones: Generic "sync spreadsheets to CRM", "move form submissions to webhook", or multi-app workflow builders are STRICTLY FORBIDDEN.
@@ -561,7 +573,7 @@ JSON Schema:
 Görevin, aşağıdaki gerçek piyasa sinyallerini analiz ederek sıfır maliyetle (React/Tailwind, Supabase free tier, Vercel free tier) 1 günde kurulabilecek TAM 3 ADET FARKLI, ÖZGÜN, YÜKSEK MONETİZASYON POTANSİYELİNE SAHİP Mikro-SaaS fikri üretmektir.
 
 Reddit / HN Şikayetleri ve Talepleri (indeksli): ${JSON.stringify(indexedSignals.length > 0 ? indexedSignals : redditData.slice(0, 10))}
-Google Trends (Bugün): ${JSON.stringify(trendData.slice(0, 10))}
+Google Trends (Bugün): ${JSON.stringify(trendData.slice(0, 10))}${dismissedBlockTr}
 
 🚫 KATI YASAKLAR (ANTİ-KLİŞE KARA LİSTE - BU FİKİRLERİ KESİNLİKLE ÜRETME):
 1. Zapier / Veri Taşıma Klonları Yasak: "E-tablodan CRM'e veri aktar, formdan webhook'a veri taşı" gibi genel otomasyon ve veri taşıma araçları KESİNLİKLE YASAKTIR.

@@ -229,7 +229,12 @@ export default function App() {
 
   const handleSniperGtm = (url: string, ideaTitle: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    const repoSlug = ideaTitle.replace(/[^a-zA-Z0-9]/g, '');
+    const turkishMap: Record<string, string> = {
+      ç: 'c', Ç: 'C', ğ: 'g', Ğ: 'G', ı: 'i', İ: 'I',
+      ö: 'o', Ö: 'O', ş: 's', Ş: 'S', ü: 'u', Ü: 'U'
+    };
+    const asciiTitle = ideaTitle.replace(/[çÇğĞıİöÖşŞüÜ]/g, ch => turkishMap[ch] || ch);
+    const repoSlug = asciiTitle.replace(/[^a-zA-Z0-9]/g, '');
     const repoUrl = `https://github.com/oguzemirtopuz/${repoSlug}`;
     const replyText = `Hey! I saw your post about this exact pain point. I'm a 15-year-old indie developer and actually built an open-source tool called ${ideaTitle} to solve it: ${repoUrl}\n\nWould love to hear your honest feedback!`;
 
@@ -411,6 +416,7 @@ export default function App() {
       const body = {
         customIdea: customIdea.trim() || undefined,
         customApiKey: effectiveKey || undefined,
+        dismissedIdeas,
         lang
       };
       const response = await fetch('/api/generate-ideas', { 
